@@ -1,0 +1,115 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+
+# background color (transparent)
+BACKCOLOR="none"
+
+# text color (white)
+TEXTCOLOR="rgb(255,255,255)"
+
+# font
+FONTNAME="Ubuntu-Medium"
+
+# size
+FONTSIZE="32"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -----------
+# create_text
+# -----------
+#
+# $1  text
+# $2  filename
+#
+function create_text()
+{
+  # create temporary files
+  local TMPFG=$(mktemp --suffix '.png')
+  local TMPBG=$(mktemp --suffix '.png')
+
+  # create text
+  convert -colorspace 'sRGB'             \
+          -type       'TrueColorMatte'   \
+          -define     'png:bit-depth=8'  \
+          -define     'png:color-type=6' \
+          -define     'png:format=png32' \
+          -background "$BACKCOLOR"       \
+          -fill       "$TEXTCOLOR"       \
+          -font       "$FONTNAME"        \
+          -pointsize  "$FONTSIZE"        \
+          -density    '288'              \
+          -resize     '25%'              \
+          label:"$1"                     \
+          "PNG32:$TMPFG"
+
+  # get size of text layer
+  local TMPW=$(identify -format "%w" "$TMPFG")
+  local TMPH=$(identify -format "%h" "$TMPFG")
+
+  # add 4 pixels (2 pixels frame at each side)
+  ((TMPW += 4))
+  ((TMPH += 4))
+
+  # show operation
+  echo "\"$1\"  -->  $2 (${TMPW}x${TMPH})"
+
+  # create background layer
+  convert -size "${TMPW}x${TMPH}" xc:"$BACKCOLOR" \
+          -colorspace 'sRGB'             \
+          -type       'TrueColorMatte'   \
+          -define     'png:bit-depth=8'  \
+          -define     'png:color-type=6' \
+          -define     'png:format=png32' \
+          "PNG32:$TMPBG"
+
+  # put text on background layer (save as specified file)
+  composite -gravity    'Center' "$TMPFG" "$TMPBG" \
+            -colorspace 'sRGB'                     \
+            -type       'TrueColorMatte'           \
+            -define     'png:bit-depth=8'          \
+            -define     'png:color-type=6'         \
+            -define     'png:format=png32'         \
+            "PNG32:$2"
+
+  # remove temporary files
+  rm "$TMPFG" "$TMPBG"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+declare -A NAMES
+NAMES['01']='Januar'
+NAMES['02']='Februar'
+NAMES['03']='März'
+NAMES['04']='April'
+NAMES['05']='Mai'
+NAMES['06']='Juni'
+NAMES['07']='Juli'
+NAMES['08']='August'
+NAMES['09']='September'
+NAMES['10']='Oktober'
+NAMES['11']='November'
+NAMES['12']='Dezember'
+
+for (( YEAR = 2000; YEAR <= 2100; YEAR++ ))
+do
+
+  for MONTH in '01' '02' '03' '04' '05' '06' '07' '08' '09' '10' '11' '12'
+  do
+
+    create_text "$YEAR-$MONTH:${NAMES[$MONTH]}" "$YEAR-$MONTH.png"
+
+  done
+
+done
+
+exit 0
+

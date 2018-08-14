@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# remove all done files
+find -type      "f"              \
+     -regextype "posix-extended" \
+     -regex     ".+\.done$"      \
+     -delete
+
+# signalize success
+exit 0
+

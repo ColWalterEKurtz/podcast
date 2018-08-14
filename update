@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# create temporary file
+TEMPFILE=$(mktemp)
+
+# clean up on exit
+trap 'rm -f "$TEMPFILE"' EXIT
+
+# create pull files for these podcast feeds
+for URL in "https://www.deutschlandfunk.de/podcast-aus-kultur-und-sozialwissenschaften.1149.de.podcast" \
+           "https://www.deutschlandfunk.de/podcast-computer-und-kommunikation-beitraege.685.de.podcast.xml" \
+           "https://www.deutschlandfunk.de/podcast-dossier.1171.de.podcast.xml" \
+           "https://www.deutschlandfunk.de/podcast-forschung-aktuell.677.de.podcast.xml" \
+           "https://www.deutschlandfunk.de/podcast-hintergrund.725.de.podcast.xml" \
+           "https://www.deutschlandfunk.de/podcast-kulturfragen.912.de.podcast.xml" \
+           "https://www.deutschlandfunkkultur.de/podcast-kulturpresseschau.1060.de.podcast.xml" \
+           "https://www.deutschlandfunk.de/podcast-sternzeit.733.de.podcast.xml" \
+           "https://www.deutschlandfunk.de/podcast-wissenschaft-im-brennpunkt.741.de.podcast.xml" \
+           "https://www1.wdr.de/mediathek/audio/zeitzeichen/zeitzeichen-podcast-100.podcast"
+do
+
+  # get podcast items
+  if ! ./fn.checkfeed "$URL" > "$TEMPFILE" ; then
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # create pull files
+  if ! ./fn.mkpullfiles "$TEMPFILE" ; then
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+done
+
+# show all pull files
+echo
+find "pull/"                     \
+     -type "f"                   \
+     -regextype "posix-extended" \
+     -regex ".+\.pull$"          \
+| sort                           \
+| nl
+echo
+
+# download episodes
+if [ "$1" == "-d" ] ; then
+
+  # just call next script
+  ./download
+
+fi
+
+# signalize success
+exit 0
+

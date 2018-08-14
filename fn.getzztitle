@@ -1,0 +1,183 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# --------------
+# get_month_name
+# --------------
+#
+# returns the name of the passed month
+#
+function get_month_name()
+{
+  case "$1" in
+  "1")  echo "Januar"    ;;
+  "2")  echo "Februar"   ;;
+  "3")  echo "Maerz"     ;;
+  "4")  echo "April"     ;;
+  "5")  echo "Mai"       ;;
+  "6")  echo "Juni"      ;;
+  "7")  echo "Juli"      ;;
+  "8")  echo "August"    ;;
+  "9")  echo "September" ;;
+  "10") echo "Oktober"   ;;
+  "11") echo "November"  ;;
+  "12") echo "Dezember"  ;;
+  *)    echo ""          ;;
+  esac
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# needed input
+readonly TITLE="$1"
+readonly AIRTIME="$2"
+
+# split date
+AIRY=$(sed -nre "s/([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\1/p" <<< "$AIRTIME")
+AIRM=$(sed -nre "s/([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\2/p" <<< "$AIRTIME")
+AIRD=$(sed -nre "s/([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\3/p" <<< "$AIRTIME")
+AIRN=$(get_month_name "$AIRM")
+
+# get date
+EPDATE=$(./fn.getzzdate "$1")
+
+# unable to extract date
+if [ -z "$EPDATE" ] ; then
+
+  # set scheme
+  EPDATE="PC-YYYY-MM-DD"
+
+fi
+
+# format title
+EPTEXT=$(sed --regexp-extended \
+             --expression="
+
+               # move Geburtstag to the front
+               s/^(.+)\(Geburtstag .+\)$/Der Geburtstag \1/
+
+               # move Geburtsjahr to the front
+               s/^(.+)\(Geburtsjahr[[:space:]]+([[:digit:]]+)\)$/Im Jahr \2 wird \1 geboren/
+
+               # move Todestag to the front
+               s/^(.+)\(Todestag .+\)$/Der Todestag \1/
+
+               # move Todesjahr to the front
+               s/^(.+)\(Todesjahr[[:space:]]+([[:digit:]]+)\)$/Im Jahr \2 stirbt \1/
+
+               # remove trailing parenthesis
+               s/[[:space:]]*\([^\)]+\)$//
+
+               # replace double quotes
+               s/\"/'/g
+
+               # expand some abbreviations
+               s/amerik\./amerikanisch/g
+               s/brit\./britisch/g
+               s/chilen\./chilenisch/g
+               s/dt\./deutsch/g
+               s/engl\./englisch/g
+               s/frz\./franzoesisch/g
+               s/ital\./italienisch/g
+               s/oesterr\./oesterreichisch/g
+               s/port\./portugisisch/g
+               s/sowj\./sowjetisch/g
+               s/span\./spanisch/g
+               s/suedafrikan\./suedafrikanisch/g
+               s/tuerk\./tuerkisch/g
+
+               # trim line
+               s/[[:space:]]+/ /g
+               s/^ //
+               s/ $//
+                
+             " <<< "$TITLE")
+
+# push new title to stdout
+echo "$EPDATE: $EPTEXT (Sendung: $AIRD. $AIRN $AIRY)"
+
+# signalize success
+exit 0
+

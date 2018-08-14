@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+sed --regexp-extended \
+    --expression="
+      # escape all colons
+      s/:/:c/g
+
+      # escape all native question marks (iconv may introduce much more)
+      s/\\?/:q/g
+
+      # collection of characters that aren't translated (suitable) by iconv
+      s/¦/|/g
+      s/¡/!/g
+      s/¿/:q/g
+      s/„/\"/g
+      s/«/\"/g
+      s/»/\"/g
+      s/÷/\//g
+      s/±/+-/g
+      s/¹/^1/g
+      s/²/^2/g
+      s/³/^3/g
+      s/Ä/Ae/g
+      s/ä/ae/g
+      s/Ö/Oe/g
+      s/ö/oe/g
+      s/Ü/Ue/g
+      s/ü/ue/g
+      s/Ø/Oe/g
+      s/ø/oe/g
+      s/Ð/Dh/g
+      s/ð/dh/g
+      s/Þ/Th/g
+      s/þ/th/g
+    "                                       \
+| iconv --from-code "UTF-8"                 \
+        --to-code "ASCII//TRANSLIT//IGNORE" \
+| sed --regexp-extended                     \
+      --expression="
+        # remove all question marks introduced by iconv
+        s/\\?//g
+
+        # restore all escaped question marks
+        s/:q/?/g
+
+        # restore all escaped colons
+        s/:c/:/g
+      "
+

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# set directory that holds the pull files
+readonly PULLDIR="pull/"
+
+# check if directory is present
+if [ -d "$PULLDIR" ] ; then
+
+  # change directory
+  cd "$PULLDIR"
+
+  # run each pull file
+  ls -b *.pull 2>"/dev/null" | sort | xargs -L1 bash
+
+fi
+
+# signalize success
+exit 0
+

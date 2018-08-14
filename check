@@ -1,0 +1,867 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# this directory holds the cfg and mp3 files
+readonly RAWDIR="raw/"
+
+# create these customized scripts
+readonly COMFILE="commit"
+readonly SKIPFILE="skip"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ------------------
+# get_first_cfg_file
+# ------------------
+#
+# This function returns the first cfg file from the 'raw' directory.
+#
+# $1  directory
+#
+function get_first_cfg_file()
+{
+  find "$1"                        \
+       -maxdepth  "1"              \
+       -type      "f"              \
+       -regextype "posix-extended" \
+       -regex     ".+\.cfg$"       \
+       -print0                     \
+  | sort -z                        \
+  | head -zn "1"
+}
+
+# ------------------
+# get_first_mp3_file
+# ------------------
+#
+# This function returns the first mp3 file from the 'raw' directory.
+#
+# $1  directory
+#
+function get_first_mp3_file()
+{
+  find "$1"                        \
+       -maxdepth  "1"              \
+       -type      "f"              \
+       -regextype "posix-extended" \
+       -regex     ".+\.mp3$"       \
+       -print0                     \
+  | sort -z                        \
+  | head -zn "1"
+}
+
+# --------
+# quotable
+# --------
+#
+# ... | quotable | ...
+#
+function quotable()
+{
+  sed --regexp-extended \
+      --expression="
+
+        # escape backslashes
+        s/\\\\/\\\\\\\\/g
+
+        # escape dollar signs
+        s/\\$/\\\\$/g
+
+        # escape double quotes
+        s/\"/\\\\\"/g
+
+      "
+}
+
+# ----------------
+# show_commit_file
+# ----------------
+#
+# $1  cfg file
+# $2  mp3 file
+#
+function show_commit_file()
+{
+  echo "#!/bin/bash"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# settings                                                              settings"
+  echo "# ------------------------------------------------------------------------------"
+  echo "set -o errtrace  # any trap on ERR is inherited by shell functions,"
+  echo "                 #   command substitutions, and commands executed in a subshell"
+  echo "                 #   environment"
+  echo "set -o nounset   # treat unset variables and parameters other than the special"
+  echo "                 #   parameters \"@\" and \"*\" as an error when performing"
+  echo "                 #   parameter expansion"
+  echo "set -o pipefail  # the return value of a pipeline is the value of the last"
+  echo "                 #   (rightmost) command to exit with a non-zero status, or"
+  echo "                 #   zero if all commands in the pipeline exit successfully"
+  echo
+  echo "# set language"
+  echo "export LANG=\"en_US.UTF-8\""
+  echo
+  echo "# use dot as decimal separator"
+  echo "export LC_NUMERIC=\"en_US.UTF-8\""
+  echo
+  echo "# terminal colors"
+  echo "readonly    NONE=\$(tput sgr0)"
+  echo "readonly     RED=\$(tput setaf 1)"
+  echo "readonly   GREEN=\$(tput setaf 2)"
+  echo "readonly  YELLOW=\$(tput setaf 3)"
+  echo "readonly    BLUE=\$(tput setaf 4)"
+  echo "readonly MAGENTA=\$(tput setaf 5)"
+  echo "readonly    CYAN=\$(tput setaf 6)"
+  echo "readonly   WHITE=\$(tput setaf 7)"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# functions                                                            functions"
+  echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# -------"
+  echo "# failmsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a red colored message via stderr."
+  echo "#"
+  echo "function failmsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${RED}[FAIL]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# warnmsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a yellow colored message via stderr."
+  echo "#"
+  echo "function warnmsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${YELLOW}[WARN]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# infomsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a blue colored message via stderr."
+  echo "#"
+  echo "function infomsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${BLUE}[INFO]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# donemsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a green colored message via stderr."
+  echo "#"
+  echo "function donemsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${GREEN}[DONE]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# ----------"
+  echo "# utf82ascii"
+  echo "# ----------"
+  echo "#"
+  echo "# ... | utf82ascii | ..."
+  echo "#"
+  echo "function utf82ascii()"
+  echo "{"
+  echo "  sed --regexp-extended \\"
+  echo "      --expression=\""
+  echo "        # escape all colons"
+  echo "        s/:/:c/g"
+  echo
+  echo "        # escape all native question marks (iconv may introduce much more)"
+  echo "        s/\\\\?/:q/g"
+  echo
+  echo "        # collection of characters that aren't translated (suitable) by iconv"
+  echo "        s/¦/|/g"
+  echo "        s/¡/!/g"
+  echo "        s/¿/:q/g"
+  echo "        s/„/\\\"/g"
+  echo "        s/«/\\\"/g"
+  echo "        s/»/\\\"/g"
+  echo "        s/÷/\\//g"
+  echo "        s/±/+-/g"
+  echo "        s/¹/^1/g"
+  echo "        s/²/^2/g"
+  echo "        s/³/^3/g"
+  echo "        s/Ä/Ae/g"
+  echo "        s/ä/ae/g"
+  echo "        s/Ö/Oe/g"
+  echo "        s/ö/oe/g"
+  echo "        s/Ü/Ue/g"
+  echo "        s/ü/ue/g"
+  echo "        s/Ø/Oe/g"
+  echo "        s/ø/oe/g"
+  echo "        s/Ð/Dh/g"
+  echo "        s/ð/dh/g"
+  echo "        s/Þ/Th/g"
+  echo "        s/þ/th/g"
+  echo "      \"                                       \\"
+  echo "  | iconv --from-code \"UTF-8\"                 \\"
+  echo "          --to-code \"ASCII//TRANSLIT//IGNORE\" \\"
+  echo "  | sed --regexp-extended                     \\"
+  echo "        --expression=\""
+  echo "          # remove all question marks introduced by iconv"
+  echo "          s/\\\\?//g"
+  echo
+  echo "          # restore all escaped question marks"
+  echo "          s/:q/?/g"
+  echo
+  echo "          # restore all escaped colons"
+  echo "          s/:c/:/g"
+  echo "        \""
+  echo "}"
+  echo
+  echo "# --------"
+  echo "# simplify"
+  echo "# --------"
+  echo "#"
+  echo "# ... | simplify | ..."
+  echo "#"
+  echo "function simplify()"
+  echo "{"
+  echo "  sed --regexp-extended \\"
+  echo "      --expression=\""
+  echo
+  echo "        # replace everything but letters and numbers"
+  echo "        s/[^[:alnum:]]+/_/g"
+  echo
+  echo "        # lower case"
+  echo "        s/.+/\\L&/"
+  echo
+  echo "        # trim both ends"
+  echo "        s/^_//"
+  echo "        s/_\$//"
+  echo
+  echo "      \""
+  echo "}"
+  echo
+  echo "# ----------------------"
+  echo "# find_next_track_number"
+  echo "# ----------------------"
+  echo "#"
+  echo "# \$1  directory"
+  echo "#"
+  echo "function find_next_track_number()"
+  echo "{"
+  echo "  {"
+  echo "    # assert at least one file to be piped"
+  echo "    echo \"000_dummy.mp3\""
+  echo
+  echo "    # find all mp3 files"
+  echo "    find \"\$1\"                                         \\"
+  echo "         -maxdepth \"1\"                                \\"
+  echo "         -type \"f\"                                    \\"
+  echo "         -regextype \"posix-extended\"                  \\"
+  echo "         -regex \".+/[[:digit:]]{3}_[^/]+\\.[Mm][Pp]3\$\" \\"
+  echo "         -printf \"%f\\n\""
+  echo
+  echo "  }                                                   \\"
+  echo "  | sort                                              \\"
+  echo "  | tail -n \"1\"                                       \\"
+  echo "  | sed -nre \"s/^0*([[:digit:]]+).+/\\1 + 1/p\"         \\"
+  echo "  | bc"
+  echo "}"
+  echo
+  echo "# ------------------"
+  echo "# create_cover_image"
+  echo "# ------------------"
+  echo "#"
+  echo "# \$1  background image"
+  echo "# \$2  foreground images (date file)"
+  echo "# \$3  jpeg quality"
+  echo "# \$4  output file"
+  echo "#"
+  echo "function create_cover_image()"
+  echo "{"
+  echo "  # create temporary file"
+  echo "  local TEMPFILE=\$(mktemp --suffix=\".png\")"
+  echo
+  echo "  # composite png images"
+  echo "  composite -gravity    \"SouthWest\"        \\"
+  echo "            \"\$2\" \"\$1\"                      \\"
+  echo "            -colorspace \"sRGB\"             \\"
+  echo "            -type       \"TrueColorMatte\"   \\"
+  echo "            -define     \"png:bit-depth=8\"  \\"
+  echo "            -define     \"png:color-type=6\" \\"
+  echo "            -define     \"png:format=png32\" \\"
+  echo "            \"PNG32:\$TEMPFILE\""
+  echo
+  echo "  # convert to jpeg"
+  echo "  convert \"\$TEMPFILE\" -quality \"\$3\" \"\$4\""
+  echo
+  echo "  # remove temporary file"
+  echo "  rm -f \"\$TEMPFILE\" 2>\"/dev/null\""
+  echo "}"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# commands                                                              commands"
+  echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# make commit work only for these files"
+  echo "CFGFILE=\"$(quotable <<< "$1")\""
+  echo "MP3FILE=\"$(quotable <<< "$2")\""
+  echo
+  echo "# check cfg file"
+  echo "if [ ! -f \"\$CFGFILE\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to locate file: \\\"\$CFGFILE\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# check mp3 file"
+  echo "if [ ! -f \"\$MP3FILE\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to locate file: \\\"\$MP3FILE\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# get directory of the cfg file (assert trailing slash)"
+  echo "ABSDIR=\$(dirname \"\$(readlink -e \"\$CFGFILE\")\" | sed -re \"s|.+|&/| ; s|//\$|/|\")"
+  echo
+  echo "# change working directory due to relative paths in the cfg file"
+  echo "cd \"\$ABSDIR\""
+  echo
+  echo "# update paths"
+  echo "CFGFILE=\$(basename \"\$CFGFILE\")"
+  echo "MP3FILE=\$(basename \"\$MP3FILE\")"
+  echo
+  echo "# show progress"
+  echo "infomsg \"operating file: \$CFGFILE\""
+  echo
+  echo "# this array holds all data from the cfg file"
+  echo "declare -A CFGDATA"
+  echo
+  echo "# read data from cfg file"
+  echo " CFGDATA[\"BACKGROUND\"]=\$(sed -nre \"s/^BACKGROUND=(.+)/\\1/p\"  \"\$CFGFILE\")"
+  echo " CFGDATA[\"FOREGROUND\"]=\$(sed -nre \"s/^FOREGROUND=(.+)/\\1/p\"  \"\$CFGFILE\")"
+  echo "CFGDATA[\"COMPRESSION\"]=\$(sed -nre \"s/^COMPRESSION=(.+)/\\1/p\" \"\$CFGFILE\")"
+  echo "     CFGDATA[\"TOPDIR\"]=\$(sed -nre \"s/^TOPDIR=(.+)/\\1/p\"      \"\$CFGFILE\")"
+  echo "      CFGDATA[\"GENRE\"]=\$(sed -nre \"s/^GENRE=(.+)/\\1/p\"       \"\$CFGFILE\" | utf82ascii)"
+  echo "     CFGDATA[\"ARTIST\"]=\$(sed -nre \"s/^ARTIST=(.+)/\\1/p\"      \"\$CFGFILE\" | utf82ascii)"
+  echo "      CFGDATA[\"ALBUM\"]=\$(sed -nre \"s/^ALBUM=(.+)/\\1/p\"       \"\$CFGFILE\" | utf82ascii)"
+  echo "       CFGDATA[\"YEAR\"]=\$(sed -nre \"s/^YEAR=(.+)/\\1/p\"        \"\$CFGFILE\")"
+  echo "      CFGDATA[\"TITLE\"]=\$(sed -nre \"s/^TITLE=(.+)/\\1/p\"       \"\$CFGFILE\" | utf82ascii)"
+  echo "    CFGDATA[\"COMMENT\"]=\$(sed -nre \"s/^COMMENT=(.+)/\\1/p\"     \"\$CFGFILE\" | utf82ascii)"
+  echo "     CFGDATA[\"AUTHOR\"]=\$(sed -nre \"s/^AUTHOR=(.+)/\\1/p\"      \"\$CFGFILE\" | utf82ascii)"
+  echo "    CFGDATA[\"AIRTIME\"]=\$(sed -nre \"s/^AIRTIME=(.+)/\\1/p\"     \"\$CFGFILE\")"
+  echo "    CFGDATA[\"SORTKEY\"]=\$(sed -nre \"s/^SORTKEY=(.+)/\\1/p\"     \"\$CFGFILE\")"
+  echo "  CFGDATA[\"WEBSOURCE\"]=\$(sed -nre \"s/^WEBSOURCE=(.+)/\\1/p\"   \"\$CFGFILE\")"
+  echo
+  echo "# check if some data is missing"
+  echo "for KEY in \"BACKGROUND\"  \\"
+  echo "           \"FOREGROUND\"  \\"
+  echo "           \"COMPRESSION\" \\"
+  echo "           \"TOPDIR\"      \\"
+  echo "           \"GENRE\"       \\"
+  echo "           \"ARTIST\"      \\"
+  echo "           \"ALBUM\"       \\"
+  echo "           \"YEAR\"        \\"
+  echo "           \"TITLE\"       \\"
+  echo "           \"COMMENT\"     \\"
+  echo "           \"AUTHOR\"      \\"
+  echo "           \"AIRTIME\"     \\"
+  echo "           \"SORTKEY\"     \\"
+  echo "           \"WEBSOURCE\""
+  echo "do"
+  echo
+  echo "  # check data"
+  echo "  if [ -z \"\${CFGDATA[\$KEY]}\" ] ; then"
+  echo
+  echo "    # notify user"
+  echo "    failmsg \"missing data: \$KEY\""
+  echo
+  echo "    # signalize trouble"
+  echo "    exit 1"
+  echo
+  echo "  fi"
+  echo
+  echo "done"
+  echo
+  echo "# assert trailing slash"
+  echo "CFGDATA[\"TOPDIR\"]=\$(sed -re \"s|.+|&/| ; s|//\$|/|\" <<< \"\${CFGDATA[TOPDIR]}\")"
+  echo
+  echo "# check if target directory is present"
+  echo "if [ ! -d \"\${CFGDATA[TOPDIR]}\" ] ; then"
+  echo
+  echo "  # try to create target directory"
+  echo "  mkdir -p \"\${CFGDATA[TOPDIR]}\" 2>\"/dev/null\""
+  echo
+  echo "  # target directory is still missing"
+  echo "  if [ ! -d \"\${CFGDATA[TOPDIR]}\" ] ; then"
+  echo
+  echo "    # notify user"
+  echo "    failmsg \"unable to create target directory: \\\"\${CFGDATA[TOPDIR]}\\\"\""
+  echo
+  echo "    # signalize trouble"
+  echo "    exit 1"
+  echo
+  echo "  fi"
+  echo
+  echo "fi"
+  echo
+  echo "# check if background image is missing"
+  echo "if [ ! -f \"\${CFGDATA[BACKGROUND]}\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to locate file: \\\"\${CFGDATA[BACKGROUND]}\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# check if foreground image is missing"
+  echo "if [ ! -f \"\${CFGDATA[FOREGROUND]}\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to locate file: \\\"\${CFGDATA[FOREGROUND]}\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# set final output directory"
+  echo "TARGETDIR=\"\${CFGDATA[TOPDIR]}\$(simplify <<< \"\${CFGDATA[ALBUM]}\")/\""
+  echo
+  echo "# check if final output directory is missing"
+  echo "if [ ! -d \"\$TARGETDIR\" ] ; then"
+  echo
+  echo "  # try to create final output directory "
+  echo "  mkdir -p \"\$TARGETDIR\" 2>\"/dev/null\""
+  echo
+  echo "  # final output directory is still missing"
+  echo "  if [ ! -d \"\$TARGETDIR\" ] ; then"
+  echo
+  echo "    # notify user"
+  echo "    failmsg \"unable to create directory: \\\"\$TARGETDIR\\\"\""
+  echo
+  echo "    # signalize trouble"
+  echo "    exit 1"
+  echo
+  echo "  fi"
+  echo
+  echo "fi"
+  echo
+  echo "# get largest unused track number"
+  echo "TRACKNUMBER=\$(find_next_track_number \"\$TARGETDIR\")"
+  echo
+  echo "# check tracknumber"
+  echo "if [ -z \"\$TRACKNUMBER\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to find largest tracknumber in \\\"\$TARGETDIR\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# set final filename"
+  echo "TARGETFILE=\$(printf \"%03d %s\" \"\$TRACKNUMBER\" \"\${CFGDATA[TITLE]}\" | simplify | sed -re \"s/.+/&.mp3/\")"
+  echo
+  echo "# just as a matter of principle"
+  echo "if [ -f \"\${TARGETDIR}\${TARGETFILE}\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"file already exists: \${TARGETDIR}\${TARGETFILE}\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# rename cfg file"
+  echo "DONEFILE=\$(sed -nre \"s/\\.cfg\$/.done/p\" <<< \"\$CFGFILE\")"
+  echo
+  echo "# check filename"
+  echo "if [ -z \"\$DONEFILE\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to rename cfg file\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# remove (reset) all current tags"
+  echo "eyeD3 --no-tagging-time-frame \\"
+  echo "      --remove-comments       \\"
+  echo "      --remove-lyrics         \\"
+  echo "      --remove-images         \\"
+  echo "      --remove-all            \\"
+  echo "      --v2                    \\"
+  echo "      --to-v2.3               \\"
+  echo "      --title=\"none\"          \\"
+  echo "      --artist=\"none\"         \\"
+  echo "      --album=\"none\"          \\"
+  echo "      --year=\"none\"           \\"
+  echo "      --track=\"1\"             \\"
+  echo "      \"\$MP3FILE\"              &>\"/dev/null\""
+  echo
+  echo "# check exit status"
+  echo "if (( \$? != 0 )) ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to edit ID3 tags: \\\"\$MP3FILE\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# create temporary file"
+  echo "FRONTCOVER=\$(mktemp --suffix=\".jpg\")"
+  echo
+  echo "# create cover image"
+  echo "create_cover_image \"\${CFGDATA[BACKGROUND]}\"  \\"
+  echo "                   \"\${CFGDATA[FOREGROUND]}\"  \\"
+  echo "                   \"\${CFGDATA[COMPRESSION]}\" \\"
+  echo "                   \"\$FRONTCOVER\""
+  echo
+  echo "# check file size"
+  echo "if [ ! -s \"\$FRONTCOVER\" ] ; then"
+  echo
+  echo "  # remove temporary file"
+  echo "  rm -f \"\$FRONTCOVER\" 2>\"/dev/null\""
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to create cover image\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# update tags"
+  echo "eyeD3 --no-tagging-time-frame                                                    \\"
+  echo "      --v2                                                                       \\"
+  echo "      --to-v2.3                                                                  \\"
+  echo "      --genre=\"\${CFGDATA[GENRE]}\"                                                \\"
+  echo "      --artist=\"\${CFGDATA[ARTIST]}\"                                              \\"
+  echo "      --album=\"\${CFGDATA[ALBUM]}\"                                                \\"
+  echo "      --title=\"\${CFGDATA[TITLE]}\"                                                \\"
+  echo "      --year=\"\${CFGDATA[YEAR]}\"                                                  \\"
+  echo "      --track=\"\$TRACKNUMBER\"                                                     \\"
+  echo "      --comment=\"eng::\${CFGDATA[COMMENT]}\"                                       \\"
+  echo "      --add-image=\"\$FRONTCOVER:FRONT_COVER:\$(basename \"\${CFGDATA[BACKGROUND]}\")\" \\"
+  echo "      --set-user-text-frame=\"AUTHOR:\${CFGDATA[AUTHOR]}\"                          \\"
+  echo "      --set-user-text-frame=\"AIRTIME:\${CFGDATA[AIRTIME]}\"                        \\"
+  echo "      --set-user-text-frame=\"SORTKEY:\${CFGDATA[SORTKEY]}\"                        \\"
+  echo "      --set-user-text-frame=\"WEBSOURCE:\${CFGDATA[WEBSOURCE]}\"                    \\"
+  echo "      \"\$MP3FILE\"                                                                 &>\"/dev/null\""
+  echo
+  echo "# remove temporary file"
+  echo "rm -f \"\$FRONTCOVER\" 2>\"/dev/null\""
+  echo
+  echo "# move mp3 file to final position"
+  echo "mv -f \"\$MP3FILE\" \"\${TARGETDIR}\${TARGETFILE}\""
+  echo
+  echo "# rename cfg file"
+  echo "mv -f \"\$CFGFILE\" \"\$DONEFILE\""
+  echo
+  echo "# show progress"
+  echo "donemsg \"file created: \${TARGETDIR}\${TARGETFILE}\""
+  echo
+  echo "# signalize success"
+  echo "exit 0"
+}
+
+# --------------
+# show_skip_file
+# --------------
+#
+# $1  cfg file
+# $2  mp3 file
+#
+function show_skip_file()
+{
+  echo "#!/bin/bash"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# settings                                                              settings"
+  echo "# ------------------------------------------------------------------------------"
+  echo "set -o errtrace  # any trap on ERR is inherited by shell functions,"
+  echo "                 #   command substitutions, and commands executed in a subshell"
+  echo "                 #   environment"
+  echo "set -o nounset   # treat unset variables and parameters other than the special"
+  echo "                 #   parameters \"@\" and \"*\" as an error when performing"
+  echo "                 #   parameter expansion"
+  echo "set -o pipefail  # the return value of a pipeline is the value of the last"
+  echo "                 #   (rightmost) command to exit with a non-zero status, or"
+  echo "                 #   zero if all commands in the pipeline exit successfully"
+  echo
+  echo "# set language"
+  echo "export LANG=\"en_US.UTF-8\""
+  echo
+  echo "# use dot as decimal separator"
+  echo "export LC_NUMERIC=\"en_US.UTF-8\""
+  echo
+  echo "# terminal colors"
+  echo "readonly    NONE=\$(tput sgr0)"
+  echo "readonly     RED=\$(tput setaf 1)"
+  echo "readonly   GREEN=\$(tput setaf 2)"
+  echo "readonly  YELLOW=\$(tput setaf 3)"
+  echo "readonly    BLUE=\$(tput setaf 4)"
+  echo "readonly MAGENTA=\$(tput setaf 5)"
+  echo "readonly    CYAN=\$(tput setaf 6)"
+  echo "readonly   WHITE=\$(tput setaf 7)"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# functions                                                            functions"
+  echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# -------"
+  echo "# failmsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a red colored message via stderr."
+  echo "#"
+  echo "function failmsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${RED}[FAIL]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# warnmsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a yellow colored message via stderr."
+  echo "#"
+  echo "function warnmsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${YELLOW}[WARN]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# infomsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a blue colored message via stderr."
+  echo "#"
+  echo "function infomsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${BLUE}[INFO]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# donemsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a green colored message via stderr."
+  echo "#"
+  echo "function donemsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${GREEN}[DONE]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# commands                                                              commands"
+  echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# make skip work only for these files"
+  echo "CFGFILE=\"$(quotable <<< "$1")\""
+  echo "MP3FILE=\"$(quotable <<< "$2")\""
+  echo
+  echo "# check cfg file"
+  echo "if [ ! -f \"\$CFGFILE\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to locate file: \\\"\$CFGFILE\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# check mp3 file"
+  echo "if [ ! -f \"\$MP3FILE\" ] ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"unable to locate file: \\\"\$MP3FILE\\\"\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# show progress"
+  echo "infomsg \"operating file: \$CFGFILE\""
+  echo
+  echo "# set name of the target directory"
+  echo "readonly SKIPDIR=\"skipped/\""
+  echo
+  echo "# check if target directory is present"
+  echo "if [ ! -d \"\$SKIPDIR\" ] ; then"
+  echo
+  echo "  # try to create target directory"
+  echo "  mkdir -p \"\$SKIPDIR\" 2>\"/dev/null\""
+  echo
+  echo "  # target directory is still missing"
+  echo "  if [ ! -d \"\$SKIPDIR\" ] ; then"
+  echo
+  echo "    # notify user"
+  echo "    failmsg \"unable to create target directory: \\\"\$SKIPDIR\\\"\""
+  echo
+  echo "    # signalize trouble"
+  echo "    exit 1"
+  echo
+  echo "  fi"
+  echo
+  echo "fi"
+  echo
+  echo "# move files to skip directory"
+  echo "mv -f -t \"\$SKIPDIR\" \"\$CFGFILE\" \"\$MP3FILE\""
+  echo
+  echo "# show progress"
+  echo "donemsg \"file skipped: \$MP3FILE\""
+  echo
+  echo "# signalize success"
+  echo "exit 0"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# get next input files
+CFGFILE=$(get_first_cfg_file "$RAWDIR")
+MP3FILE=$(get_first_mp3_file "$RAWDIR")
+
+# no more input files
+[ -z "$CFGFILE" ] && exit 1
+[ -z "$MP3FILE" ] && exit 1
+
+# play mp3 file in background
+mplayer -nolirc -vc "null" -vo "null" -loop "0" "$MP3FILE" &>"/dev/null" &
+
+# get mplayer's process ID
+PID="$!"
+
+# open editor
+vim "+/TITLE=" "$CFGFILE"
+
+# check if mplayer is still running
+PROC=$(ps -A | grep -E "^[[:space:]]*$PID[[:space:]].+mplayer$")
+
+# check process
+if [ -n "$PROC" ]; then
+
+  # kill mplayer
+  kill -s "SIGTERM" "$PID"
+
+fi
+
+# create customized commit file
+show_commit_file "$CFGFILE" "$MP3FILE" > "$COMFILE"
+
+# create customized skip file
+show_skip_file "$CFGFILE" "$MP3FILE" > "$SKIPFILE"
+
+# set executable
+chmod u+x "$COMFILE" "$SKIPFILE"
+
+# signalize success
+exit 0
+

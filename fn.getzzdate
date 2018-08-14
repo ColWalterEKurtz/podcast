@@ -1,0 +1,392 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# format string: Epoch-YYYY-MM-DD
+readonly OUTPUTFORMAT="%s-%04d-%02d-%02d"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ---------
+# get_epoch
+# ---------
+#
+# $1  title
+#
+function get_epoch()
+{
+  # v. Chr.
+  local readonly VCR="([^[:alpha:]])([Vv]\.[[:space:]]*[Cc][Hh][Rr]\.)([^[:alpha:]])"
+
+  # try to find regular expression
+  local EPOCH=$(sed -nre "s/.*$VCR.*/\2/p" <<< "$1")
+
+  # expression found
+  if [ -n "$EPOCH" ] ; then
+
+    # push epoch to stdout
+    printf "%s" "AC"
+
+    # exit function
+    return 0
+
+  fi
+
+  # push default value to stdout
+  printf "%s" "PC"
+
+  # signalize success
+  return 0
+}
+
+# ------------
+# get_date_v01
+# ------------
+#
+# $1  title
+#
+# Alfred Doeblin, Schriftsteller (Geburtstag 10.08.1878)
+#
+function get_date_v01()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+
+  # set regular expression to use
+  local readonly REG=".+\(.+[[:space:]]0*($NUM)${SEP}0*($NUM)${SEP}0*($NUM)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\3/p" <<< "$1")
+  local EPM=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPD=$(sed -nre "s/$REG/\1/p" <<< "$1")
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$OUTPUTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------
+# get_date_v02
+# ------------
+#
+# $1  title
+#
+# Indisches "Gesetz gegen sexuelle Belaestigung" (23.04.2013)
+#
+function get_date_v02()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+
+  # set regular expression to use
+  local readonly REG=".+\(0*($NUM)${SEP}0*($NUM)${SEP}0*($NUM)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\3/p" <<< "$1")
+  local EPM=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPD=$(sed -nre "s/$REG/\1/p" <<< "$1")
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$OUTPUTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------
+# get_date_v03
+# ------------
+#
+# $1  title
+#
+# Die "Union von Kalmar" wird geschlossen (im Juli 1397)
+#
+function get_date_v03()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+
+  # set regular expression to use
+  local readonly REG=".+[^[:alpha:]]im +([^ ]+) +([[:digit:]]+)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPX=$(sed -nre "s/$REG/\1/p" <<< "$1")
+  local EPD=0
+
+  # set month
+  case "$EPX" in
+    "Januar")    EPM="1"  ;;
+    "Februar")   EPM="2"  ;;
+    "Maerz")     EPM="3"  ;;
+    "April")     EPM="4"  ;;
+    "Mai")       EPM="5"  ;;
+    "Juni")      EPM="6"  ;;
+    "Juli")      EPM="7"  ;;
+    "August")    EPM="8"  ;;
+    "September") EPM="9"  ;;
+    "Oktober")   EPM="10" ;;
+    "November")  EPM="11" ;;
+    "Dezember")  EPM="12" ;;
+    *)           EPM="0"  ;;
+  esac
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$OUTPUTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------
+# get_date_v04
+# ------------
+#
+# $1  title
+#
+# Romulus gruendet Rom (am 21.04.753 v. Chr.)
+#
+function get_date_v04()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+  local readonly VCR="[^[:alpha:]][Vv]\.[[:space:]]*[Cc][Hh][Rr]\.[[:space:]]*"
+
+  # set regular expression to use
+  local readonly REG=".+\(.+[[:space:]]0*($NUM)${SEP}0*($NUM)${SEP}0*($NUM)$VCR\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\3/p" <<< "$1")
+  local EPM=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPD=$(sed -nre "s/$REG/\1/p" <<< "$1")
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$OUTPUTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------
+# get_date_v05
+# ------------
+#
+# $1  title
+#
+# Avicenna, Arzt und Philosoph (Todesjahr 1037)
+#
+function get_date_v05()
+{
+  # set regular expression to use
+  local readonly REG=".+\([^\.]+[[:space:]]+([[:digit:]]+)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\1/p" <<< "$1")
+  local EPM="0"
+  local EPD="0"
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$OUTPUTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# version 1
+EPDATE=$(get_date_v01 "$1")
+
+# check result
+if [ -n "$EPDATE" ] ; then
+
+  # push to stdout
+  echo "$EPDATE"
+
+  # signalize success
+  exit 0
+
+fi
+
+# version 2
+EPDATE=$(get_date_v02 "$1")
+
+# check result
+if [ -n "$EPDATE" ] ; then
+
+  # push to stdout
+  echo "$EPDATE"
+
+  # signalize success
+  exit 0
+
+fi
+
+# version 3
+EPDATE=$(get_date_v03 "$1")
+
+# check result
+if [ -n "$EPDATE" ] ; then
+
+  # push to stdout
+  echo "$EPDATE"
+
+  # signalize success
+  exit 0
+
+fi
+
+# version 4
+EPDATE=$(get_date_v04 "$1")
+
+# check result
+if [ -n "$EPDATE" ] ; then
+
+  # push to stdout
+  echo "$EPDATE"
+
+  # signalize success
+  exit 0
+
+fi
+
+# version 5
+EPDATE=$(get_date_v05 "$1")
+
+# check result
+if [ -n "$EPDATE" ] ; then
+
+  # push to stdout
+  echo "$EPDATE"
+
+  # signalize success
+  exit 0
+
+fi
+
+# notify user
+failmsg "unable to extract episode's date: \"$1\""
+
+# signalize trouble
+exit 1
+

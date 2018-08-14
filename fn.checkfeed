@@ -1,0 +1,302 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errexit   # exit immediately if a command exits with a non-zero status
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# --------
+# get_html
+# --------
+#
+# $1  URL
+#
+function get_html()
+{
+  # send query
+  wget --quiet                           \
+       --user-agent=""                   \
+       --timeout="60"                    \
+       -O -                              \
+       "$1"                              \
+  | tr "\n" " "                          \
+  | sed -re "s/</\x0A</g"                \
+  | sed -re "/^<script/,/^<\/script>/ d" \
+  | sed -re "s/[[:space:]]+/ /g"         \
+  | sed -re "$ s/$/\x0A/"
+}
+
+# ------------
+# get_encoding
+# ------------
+#
+# $1  filename (xml file)
+#
+function get_encoding()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # get encoding from xml tag
+        s/^<\?[Xx][Mm][Ll][[:space:]].*[Ee][Nn][Cc][Oo][Dd][Ii][Nn][Gg]=\"([^\"]+)\".*/ENCODING=\U\1/p
+
+        # skip q if s failed
+        T ; q
+
+      " "$1"
+}
+
+# -------------
+# get_feed_link
+# -------------
+#
+# $1  filename (xml file)
+#
+function get_feed_link()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # set scope
+        1,/<link>/ {
+
+          # crop link value
+          s/^<link>[[:space:]]*(.+)[[:space:]]*$/FEED_LINK=\1/p
+
+        }
+
+      " "$1"
+}
+
+# --------------
+# get_feed_title
+# --------------
+#
+# $1  filename (xml file)
+#
+function get_feed_title()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # set scope
+        1,/<title>/ {
+
+          # crop title value
+          s/^<title>[[:space:]]*(.+)[[:space:]]*$/FEED_TITLE=\1/p
+
+        }
+
+      " "$1"
+}
+
+# ---------
+# get_items
+# ---------
+#
+# $1  filename (xml file)
+#
+function get_items()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # set scope
+        /^<[Ii][Tt][Ee][Mm]>/,/^<\/[Ii][Tt][Ee][Mm]>/ {
+
+          # start item
+          s/^<[Ii][Tt][Ee][Mm]>/ITEM=BEGIN/p
+
+          # end item
+          s/^<\/[Ii][Tt][Ee][Mm]>/ITEM=END/p
+
+          # title
+          s/^<[Tt][Ii][Tt][Ll][Ee]>[[:space:]]*(.+)[[:space:]]*$/TITLE=\1/p
+
+          # media
+          s/^<[Ee][Nn][Cc][Ll][Oo][Ss][Uu][Rr][Ee].+[Uu][Rr][Ll]=\"([^\"]+\.[Mm][Pp]3)\".+/MEDIA=\1/p
+
+          # date
+          s/^<[Pp][Uu][Bb][Dd][Aa][Tt][Ee]>(.+)/DATE=\1/p
+
+          # author
+          s/^<[Ii][Tt][Uu][Nn][Ee][Ss]:[Aa][Uu][Tt][Hh][Oo][Rr]>(.+)/AUTHOR=\1/p
+
+          # description
+          /^<[Dd][Ee][Ss][Cc][Rr][Ii][Pp][Tt][Ii][Oo][Nn]>/,/^<\/[Dd][Ee][Ss][Cc][Rr][Ii][Pp][Tt][Ii][Oo][Nn]>/ {
+
+            # end of description
+            /^<\/[Dd][Ee][Ss][Cc][Rr][Ii][Pp][Tt][Ii][Oo][Nn]>/ {
+
+              # copy hold space to pattern space
+              g
+
+              # concatenate lines
+              s/\x0A/ /g
+
+              # trim lines
+              s/ +/ /g
+              s/^ //
+              s/ $//
+
+              # add tag
+              s/.+/DESCRIPTION=&/p
+
+              # empty pattern space
+              s/.*//
+
+              # empty hold space
+              h
+
+              # next line
+              b
+            }
+
+            # drop these patterns
+            s/<!\[CDATA\[//g
+            s/\]\]>//g
+            s/<[^>]+>/ /g
+            s/&#[Xx][Dd];/ /g
+            s/&[Aa][Mm][Pp];/\&/g
+
+            # append to hold space
+            H
+          }
+        }
+
+      " "$1"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# check number of parameters
+if (( $# != 1 )) ; then
+
+  # notify user
+  failmsg "exactly one URL needed: $(basename "$0") <URL>"
+
+  # signalize trouble
+  exit 1
+
+else
+
+  # set podcast url
+  URL="$1"
+
+fi
+
+# create temporary file
+TEMPFILE=$(mktemp)
+
+# remove temporary file on exit
+trap 'rm -rf "$TEMPFILE"' EXIT
+
+# notify user
+infomsg "updating rss feed: $URL"
+
+# download xml file once
+get_html "$URL" > "$TEMPFILE"
+
+# unable to read xml file
+if [ ! -s "$TEMPFILE" ] ; then
+
+  # notify user
+  failmsg "unable to  read data from \"$URL\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# get data from xml file
+get_encoding   "$TEMPFILE"
+get_feed_link  "$TEMPFILE"
+get_feed_title "$TEMPFILE"
+get_items      "$TEMPFILE"
+
+# signalize success
+exit 0
+

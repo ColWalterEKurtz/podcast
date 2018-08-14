@@ -1,0 +1,1322 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errexit   # exit immediately if a command exits with a non-zero status
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# pull files will be created in this directory
+readonly PULLDIR="pull/"
+
+# the list of pull files that have been created once
+readonly DBFILE="pulldb"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# --------------
+# get_month_name
+# --------------
+#
+# returns the name of the passed month
+#
+function get_month_name()
+{
+  case "$1" in
+  "1")  echo "Januar"    ;;
+  "2")  echo "Februar"   ;;
+  "3")  echo "Maerz"     ;;
+  "4")  echo "April"     ;;
+  "5")  echo "Mai"       ;;
+  "6")  echo "Juni"      ;;
+  "7")  echo "Juli"      ;;
+  "8")  echo "August"    ;;
+  "9")  echo "September" ;;
+  "10") echo "Oktober"   ;;
+  "11") echo "November"  ;;
+  "12") echo "Dezember"  ;;
+  *)    echo ""          ;;
+  esac
+}
+
+# --------
+# simplify
+# --------
+#
+# ... | simplify | ...
+#
+function simplify()
+{
+  sed --regexp-extended \
+      --expression="
+
+        # replace everything but letters and numbers
+        s/[^[:alnum:]]+/_/g
+
+        # lower case
+        s/.+/\L&/
+
+        # trim both ends
+        s/^_//
+        s/_$//
+
+      "
+}
+
+# --------
+# quotable
+# --------
+#
+# ... | quotable | ...
+#
+function quotable()
+{
+  sed --regexp-extended \
+      --expression="
+
+        # escape backslashes
+        s/\\\\/\\\\\\\\/g
+
+        # escape dollar signs
+        s/\\$/\\\\$/g
+
+        # escape double quotes
+        s/\"/\\\\\"/g
+
+      "
+}
+
+# ---------------
+# sec_to_midnight
+# ---------------
+#
+# $1  date
+#
+function sec_to_midnight()
+{
+  # split '... hh:mm:ss ...'
+  local HOR=$(sed -nre "s/.*[^[:digit:]]0*([[:digit:]]+):0*([[:digit:]]+):0*([[:digit:]]+).*/\1/p" <<< "$1")
+  local MIN=$(sed -nre "s/.*[^[:digit:]]0*([[:digit:]]+):0*([[:digit:]]+):0*([[:digit:]]+).*/\2/p" <<< "$1")
+  local SEC=$(sed -nre "s/.*[^[:digit:]]0*([[:digit:]]+):0*([[:digit:]]+):0*([[:digit:]]+).*/\3/p" <<< "$1")
+
+  # push seconds to stdout
+  bc <<< "86400 - ($HOR * 3600 + $MIN * 60 + $SEC)" | xargs printf "%05d\n"
+}
+
+# --------------
+# get_feed_title
+# --------------
+#
+# $1  feed file
+#
+function get_feed_title()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # crop feed title
+        s/^FEED_TITLE=(.+)/\1/p
+
+        # quit after first substitution
+        T ; q
+
+      " "$1"
+}
+
+# -----------------
+# get_episode_media
+# -----------------
+#
+# $1  feed file
+#
+function get_episode_media()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # limit scope to first item
+        /^ITEM=BEGIN/,/^ITEM=END/ {
+
+          # crop title
+          s/^MEDIA=(.+)/\1/p
+
+          # stop after first item
+         /^ITEM=END/ { q }
+
+        }
+
+      " "$1"
+}
+
+# -----------------
+# get_episode_title
+# -----------------
+#
+# $1  feed file
+#
+function get_episode_title()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # limit scope to first item
+        /^ITEM=BEGIN/,/^ITEM=END/ {
+
+          # crop title
+          s/^TITLE=(.+)/\1/p
+
+          # stop after first item
+         /^ITEM=END/ { q }
+
+        }
+
+      " "$1"
+}
+
+# ------------------
+# get_episode_author
+# ------------------
+#
+# $1  feed file
+#
+function get_episode_author()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # limit scope to first item
+        /^ITEM=BEGIN/,/^ITEM=END/ {
+
+          # crop author
+          s/^AUTHOR=(.+)/\1/p
+
+          # stop after first item
+         /^ITEM=END/ { q }
+
+        }
+
+      " "$1"
+}
+
+# ----------------
+# get_episode_date
+# ----------------
+#
+# $1  feed file
+#
+function get_episode_date()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # limit scope to first item
+        /^ITEM=BEGIN/,/^ITEM=END/ {
+
+          # crop date
+          s/^DATE=(.+)/\1/p
+
+          # stop after first item
+         /^ITEM=END/ { q }
+
+        }
+
+      " "$1"
+}
+
+# -----------------------
+# get_episode_description
+# -----------------------
+#
+# $1  feed file
+#
+function get_episode_description()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # limit scope to first item
+        /^ITEM=BEGIN/,/^ITEM=END/ {
+
+          # crop description
+          s/^DESCRIPTION=(.+)/\1/p
+
+          # stop after first item
+         /^ITEM=END/ { q }
+
+        }
+
+      " "$1"
+}
+
+# ---------------
+# drop_first_item
+# ---------------
+#
+# $1  feed file
+#
+function drop_first_item()
+{
+  sed --quiet           \
+      --in-place        \
+      --regexp-extended \
+      --expression="
+
+        # first item found
+        /^ITEM=BEGIN/ {
+
+          :skip
+
+          # first item finished
+          /^ITEM=END/ {
+
+            # print succeeding lines
+            :show n ; p ; b show
+
+          }
+
+          # next line from first item
+          n ; b skip
+        }
+
+        # print preceeding lines
+        p
+
+      " "$1"
+}
+
+# --------------------
+# get_background_image
+# --------------------
+#
+# $1  feed title
+#
+function get_background_image()
+{
+  # root directory for all background images
+  local readonly IMAGEDIR="../images/"
+
+  # set paths of known images
+  local readonly        BRENNPUNKT="${IMAGEDIR}brennpunkt.png"
+  local readonly            COMKOM="${IMAGEDIR}comkom.png"
+  local readonly           DOSSIER="${IMAGEDIR}dossier.png"
+  local readonly         FORSCHUNG="${IMAGEDIR}forschung.png"
+  local readonly       HINTERGRUND="${IMAGEDIR}hintergrund.png"
+  local readonly      KULTURFRAGEN="${IMAGEDIR}kulturfragen.png"
+  local readonly KULTURPRESSESCHAU="${IMAGEDIR}kulturpresseschau.png"
+  local readonly            KUSOWI="${IMAGEDIR}kusowi.png"
+  local readonly         STERNZEIT="${IMAGEDIR}sternzeit.png"
+  local readonly       ZEITZEICHEN="${IMAGEDIR}zeitzeichen.png"
+
+  # check feed title
+  case "$1" in
+
+    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
+      echo "$KUSOWI"
+      return 0
+      ;;
+
+    "Computer und Kommunikation Beitraege - Deutschlandfunk")
+      echo "$COMKOM"
+      return 0
+      ;;
+
+    "Dossier - Deutschlandfunk")
+      echo "$DOSSIER"
+      return 0
+      ;;
+
+    "Forschung Aktuell - Deutschlandfunk")
+      echo "$FORSCHUNG"
+      return 0
+      ;;
+
+    "Hintergrund - Deutschlandfunk")
+      echo "$HINTERGRUND"
+      return 0
+      ;;
+
+    "Kulturfragen - Deutschlandfunk")
+      echo "$KULTURFRAGEN"
+      return 0
+      ;;
+
+    "Kulturpresseschau - Deutschlandfunk Kultur")
+      echo "$KULTURPRESSESCHAU"
+      return 0
+      ;;
+
+    "Sternzeit - Deutschlandfunk")
+      echo "$STERNZEIT"
+      return 0
+      ;;
+
+    "WDR ZeitZeichen")
+      echo "$ZEITZEICHEN"
+      return 0
+      ;;
+
+    "Wissenschaft im Brennpunkt - Deutschlandfunk")
+      echo "$BRENNPUNKT"
+      return 0
+      ;;
+
+  esac
+
+  # notify user
+  failmsg "unknown feed: \"$1\""
+
+  # signalize trouble
+  return 1
+}
+
+# --------------------
+# get_foreground_image
+# --------------------
+#
+# $1  UTC date
+#
+function get_foreground_image()
+{
+  # source directory for all date files
+  local readonly IMAGEDIR="../images/months/"
+
+  # get year and month from date
+  local UTCY=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-.+/\1/p" <<< "$1")
+  local UTCM=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-.+/\2/p" <<< "$1")
+
+  # set expected filename
+  local FILENAME=$(printf "%s%d-%02d.png" "$IMAGEDIR" "$UTCY" "$UTCM")
+
+  # push filename to stdout
+  echo "$FILENAME"
+
+  # signalize success
+  return 0
+}
+
+# ---------------------
+# get_image_compression
+# ---------------------
+#
+# $1  feed title
+#
+function get_image_compression()
+{
+  # set known quality factors (target file size: <80KB)
+  local readonly        BRENNPUNKT="93"
+  local readonly            COMKOM="97"
+  local readonly           DOSSIER="100"
+  local readonly         FORSCHUNG="94"
+  local readonly       HINTERGRUND="92"
+  local readonly      KULTURFRAGEN="96"
+  local readonly KULTURPRESSESCHAU="99"
+  local readonly            KUSOWI="97"
+  local readonly         STERNZEIT="97"
+  local readonly       ZEITZEICHEN="95"
+
+  # check feed title
+  case "$1" in
+
+    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
+      echo "$KUSOWI"
+      return 0
+      ;;
+
+    "Computer und Kommunikation Beitraege - Deutschlandfunk")
+      echo "$COMKOM"
+      return 0
+      ;;
+
+    "Dossier - Deutschlandfunk")
+      echo "$DOSSIER"
+      return 0
+      ;;
+
+    "Forschung Aktuell - Deutschlandfunk")
+      echo "$FORSCHUNG"
+      return 0
+      ;;
+
+    "Hintergrund - Deutschlandfunk")
+      echo "$HINTERGRUND"
+      return 0
+      ;;
+
+    "Kulturfragen - Deutschlandfunk")
+      echo "$KULTURFRAGEN"
+      return 0
+      ;;
+
+    "Kulturpresseschau - Deutschlandfunk Kultur")
+      echo "$KULTURPRESSESCHAU"
+      return 0
+      ;;
+
+    "Sternzeit - Deutschlandfunk")
+      echo "$STERNZEIT"
+      return 0
+      ;;
+
+    "WDR ZeitZeichen")
+      echo "$ZEITZEICHEN"
+      return 0
+      ;;
+
+    "Wissenschaft im Brennpunkt - Deutschlandfunk")
+      echo "$BRENNPUNKT"
+      return 0
+      ;;
+
+  esac
+
+  # notify user
+  failmsg "unknown feed: \"$1\""
+
+  # signalize trouble
+  return 1
+}
+
+# ----------
+# get_topdir
+# ----------
+#
+# $1  feed title
+#
+function get_topdir()
+{
+  # root directory for all audio files
+  local readonly ROOTDIR="../audio/"
+
+  # set directories of known feeds
+  local readonly        BRENNPUNKT="${ROOTDIR}Brennpunkt/"
+  local readonly            COMKOM="${ROOTDIR}ComKom/"
+  local readonly           DOSSIER="${ROOTDIR}Dossier/"
+  local readonly         FORSCHUNG="${ROOTDIR}Forschung/"
+  local readonly       HINTERGRUND="${ROOTDIR}Hintergrund/"
+  local readonly      KULTURFRAGEN="${ROOTDIR}Kulturfragen/"
+  local readonly KULTURPRESSESCHAU="${ROOTDIR}Kulturpresseschau/"
+  local readonly            KUSOWI="${ROOTDIR}KuSoWi/"
+  local readonly         STERNZEIT="${ROOTDIR}Sternzeit/"
+  local readonly       ZEITZEICHEN="${ROOTDIR}ZeitZeichen/"
+
+  # check feed title
+  case "$1" in
+
+    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
+      echo "$KUSOWI"
+      return 0
+      ;;
+
+    "Computer und Kommunikation Beitraege - Deutschlandfunk")
+      echo "$COMKOM"
+      return 0
+      ;;
+
+    "Dossier - Deutschlandfunk")
+      echo "$DOSSIER"
+      return 0
+      ;;
+
+    "Forschung Aktuell - Deutschlandfunk")
+      echo "$FORSCHUNG"
+      return 0
+      ;;
+
+    "Hintergrund - Deutschlandfunk")
+      echo "$HINTERGRUND"
+      return 0
+      ;;
+
+    "Kulturfragen - Deutschlandfunk")
+      echo "$KULTURFRAGEN"
+      return 0
+      ;;
+
+    "Kulturpresseschau - Deutschlandfunk Kultur")
+      echo "$KULTURPRESSESCHAU"
+      return 0
+      ;;
+
+    "Sternzeit - Deutschlandfunk")
+      echo "$STERNZEIT"
+      return 0
+      ;;
+
+    "WDR ZeitZeichen")
+      echo "$ZEITZEICHEN"
+      return 0
+      ;;
+
+    "Wissenschaft im Brennpunkt - Deutschlandfunk")
+      echo "$BRENNPUNKT"
+      return 0
+      ;;
+
+  esac
+
+  # notify user
+  failmsg "unknown feed: \"$1\""
+
+  # signalize trouble
+  return 1
+}
+
+# ----------
+# get_artist
+# ----------
+#
+# $1  feed title
+#
+function get_artist()
+{
+  # set artists of known feeds
+  local readonly        BRENNPUNKT="DLF - Wissenschaft im Brennpunkt"
+  local readonly            COMKOM="DLF - Computer und Kommunikation"
+  local readonly           DOSSIER="DLF - Dossier"
+  local readonly         FORSCHUNG="DLF - Forschung Aktuell"
+  local readonly       HINTERGRUND="DLF - Hintergrund"
+  local readonly      KULTURFRAGEN="DLF - Kulturfragen"
+  local readonly KULTURPRESSESCHAU="DRK - Kulturpresseschau"
+  local readonly            KUSOWI="DLF - Aus Kultur- und Sozialwissenschaften"
+  local readonly         STERNZEIT="DLF - Sternzeit"
+  local readonly       ZEITZEICHEN="WDR 5 - ZeitZeichen"
+
+  # check feed title
+  case "$1" in
+
+    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
+      echo "$KUSOWI"
+      return 0
+      ;;
+
+    "Computer und Kommunikation Beitraege - Deutschlandfunk")
+      echo "$COMKOM"
+      return 0
+      ;;
+
+    "Dossier - Deutschlandfunk")
+      echo "$DOSSIER"
+      return 0
+      ;;
+
+    "Forschung Aktuell - Deutschlandfunk")
+      echo "$FORSCHUNG"
+      return 0
+      ;;
+
+    "Hintergrund - Deutschlandfunk")
+      echo "$HINTERGRUND"
+      return 0
+      ;;
+
+    "Kulturfragen - Deutschlandfunk")
+      echo "$KULTURFRAGEN"
+      return 0
+      ;;
+
+    "Kulturpresseschau - Deutschlandfunk Kultur")
+      echo "$KULTURPRESSESCHAU"
+      return 0
+      ;;
+
+    "Sternzeit - Deutschlandfunk")
+      echo "$STERNZEIT"
+      return 0
+      ;;
+
+    "WDR ZeitZeichen")
+      echo "$ZEITZEICHEN"
+      return 0
+      ;;
+
+    "Wissenschaft im Brennpunkt - Deutschlandfunk")
+      echo "$BRENNPUNKT"
+      return 0
+      ;;
+
+  esac
+
+  # notify user
+  failmsg "unknown feed: \"$1\""
+
+  # signalize trouble
+  return 1
+}
+
+# ---------
+# get_album
+# ---------
+#
+# $1  UTC date
+#
+function get_album()
+{
+  # get year and month from date
+  local UTCY=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-.+/\1/p" <<< "$1")
+  local UTCM=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-.+/\2/p" <<< "$1")
+
+  # get name from number
+  local NAME=$(get_month_name "$UTCM")
+
+  # push album to stdout
+  printf "%04d-%02d:%s\n" "$UTCY" "$UTCM" "$NAME"
+
+  # signalize success
+  return 0
+}
+
+# --------
+# get_year
+# --------
+#
+# $1  UTC date
+#
+function get_year()
+{
+  # get year from date
+  local UTCY=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-.+/\1/p" <<< "$1")
+
+  # push year to stdout
+  printf "%04d\n" "$UTCY"
+
+  # signalize success
+  return 0
+}
+
+# ---------
+# get_title
+# ---------
+#
+# $1  feed title
+# $2  episode title
+# $3  author
+# $4  UTC date
+#
+function get_title()
+{
+  # get year, month and day from date
+  local UTCY=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\1/p" <<< "$4")
+  local UTCM=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\2/p" <<< "$4")
+  local UTCD=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\3/p" <<< "$4")
+
+  # get name from number
+  local NAME=$(get_month_name "$UTCM")
+
+  # ZeitZeichen
+  if [ "$1" == "WDR ZeitZeichen" ] ; then
+
+    # push title to stdout
+    ./fn.getzztitle "$2" "$4"
+
+  # default
+  else
+
+    # push title to stdout
+    echo "$2 ($3: $UTCD. $NAME $UTCY)"
+
+  fi
+
+  # signalize success
+  return 0
+}
+
+# ----------
+# get_author
+# ----------
+#
+# $1  author
+#
+function get_author()
+{
+  echo "$1"               \
+  | sed --regexp-extended \
+        --expression="
+
+          # replace each 'und' with a real separator
+          s/ und / ; /g
+
+          # replace each slash with a real separator
+          s|/|;|g
+
+          # split line at each semicolon
+          s/;/\x0A/g
+
+        "                 \
+  | sed --regexp-extended \
+        --expression="
+
+          # operate lines without comma
+          /,/! {
+
+            # swap first and last name
+            s/^ *(.+[^ ]) +([^ ]+) *$/\2, \1/
+
+          }
+        "                 \
+  | sed --quiet           \
+        --regexp-extended \
+        --expression="
+
+          # append pattern to hold space
+          H
+
+          # last line
+          $ {
+
+            # copy hold to pattern space
+            g
+
+            # concatenate all lines
+            s/\x0A/; /g
+
+            # let each separator be followed by space
+            s/ *([,;]) */\1 /g
+
+            # trim both ends
+            s/^[; ]+//
+            s/[; ]+$//
+
+            # print one single line
+            p
+          }
+        "
+
+  # signalize success
+  return 0
+}
+
+# --------------
+# show_pull_file
+# --------------
+#
+# this function uses following global variables:
+#   PULL_WEB_SRC
+#   PULL_OUT_DIR
+#   PULL_OUT_MP3
+#   PULL_OUT_CFG
+#   CFG_BACKGROUND
+#   CFG_FOREGROUND
+#   CFG_COMPRESSION
+#   CFG_TOPDIR
+#   CFG_GENRE
+#   CFG_ARTIST
+#   CFG_ALBUM
+#   CFG_YEAR
+#   CFG_TITLE
+#   CFG_AUTHOR
+#   CFG_COMMENT
+#   CFG_AIRTIME
+#   CFG_SORTKEY
+#
+function show_pull_file()
+{
+  echo "#!/bin/bash"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# settings                                                              settings"
+  echo "# ------------------------------------------------------------------------------"
+  echo "set -o errtrace  # any trap on ERR is inherited by shell functions,"
+  echo "                 #   command substitutions, and commands executed in a subshell"
+  echo "                 #   environment"
+  echo "set -o nounset   # treat unset variables and parameters other than the special"
+  echo "                 #   parameters \"@\" and \"*\" as an error when performing"
+  echo "                 #   parameter expansion"
+  echo "set -o pipefail  # the return value of a pipeline is the value of the last"
+  echo "                 #   (rightmost) command to exit with a non-zero status, or"
+  echo "                 #   zero if all commands in the pipeline exit successfully"
+  echo
+  echo "# set language"
+  echo "export LANG=\"en_US.UTF-8\""
+  echo
+  echo "# use dot as decimal separator"
+  echo "export LC_NUMERIC=\"en_US.UTF-8\""
+  echo
+  echo "# terminal colors"
+  echo "readonly    NONE=\$(tput sgr0)"
+  echo "readonly     RED=\$(tput setaf 1)"
+  echo "readonly   GREEN=\$(tput setaf 2)"
+  echo "readonly  YELLOW=\$(tput setaf 3)"
+  echo "readonly    BLUE=\$(tput setaf 4)"
+  echo "readonly MAGENTA=\$(tput setaf 5)"
+  echo "readonly    CYAN=\$(tput setaf 6)"
+  echo "readonly   WHITE=\$(tput setaf 7)"
+  echo
+  echo "# pull information"
+  echo "readonly WEB_SRC=\"$(quotable <<< $PULL_WEB_SRC)\""
+  echo "readonly OUT_DIR=\"$(quotable <<< $PULL_OUT_DIR)\""
+  echo "readonly OUT_MP3=\"$(quotable <<< $PULL_OUT_MP3)\""
+  echo "readonly OUT_CFG=\"$(quotable <<< $PULL_OUT_CFG)\""
+  echo
+  echo "# cfg information"
+  echo "readonly CFG_BACKGROUND=\"$(quotable <<< $CFG_BACKGROUND)\""
+  echo "readonly CFG_FOREGROUND=\"$(quotable <<< $CFG_FOREGROUND)\""
+  echo "readonly CFG_COMPRESSION=\"$(quotable <<< $CFG_COMPRESSION)\""
+  echo "readonly CFG_TOPDIR=\"$(quotable <<< $CFG_TOPDIR)\""
+  echo "readonly CFG_GENRE=\"$(quotable <<< $CFG_GENRE)\""
+  echo "readonly CFG_ARTIST=\"$(quotable <<< $CFG_ARTIST)\""
+  echo "readonly CFG_ALBUM=\"$(quotable <<< $CFG_ALBUM)\""
+  echo "readonly CFG_YEAR=\"$(quotable <<< $CFG_YEAR)\""
+  echo "readonly CFG_TITLE=\"$(quotable <<< $CFG_TITLE)\""
+  echo "readonly CFG_AUTHOR=\"$(quotable <<< $CFG_AUTHOR)\""
+  echo "readonly CFG_COMMENT=\"$(quotable <<< $CFG_COMMENT)\""
+  echo "readonly CFG_AIRTIME=\"$(quotable <<< $CFG_AIRTIME)\""
+  echo "readonly CFG_SORTKEY=\"$(quotable <<< $CFG_SORTKEY)\""
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# functions                                                            functions"
+  echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# -------"
+  echo "# failmsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a red colored message via stderr."
+  echo "#"
+  echo "function failmsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${RED}[FAIL]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# warnmsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a yellow colored message via stderr."
+  echo "#"
+  echo "function warnmsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${YELLOW}[WARN]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# infomsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a blue colored message via stderr."
+  echo "#"
+  echo "function infomsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${BLUE}[INFO]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# -------"
+  echo "# donemsg"
+  echo "# -------"
+  echo "#"
+  echo "# This function prints a green colored message via stderr."
+  echo "#"
+  echo "function donemsg()"
+  echo "{"
+  echo "  # push to stderr"
+  echo "  echo -e \"\${GREEN}[DONE]\${NONE} \$1\" 1>&2"
+  echo "}"
+  echo
+  echo "# --------------"
+  echo "# download_media"
+  echo "# --------------"
+  echo "#"
+  echo "# \$1  download url"
+  echo "# \$2  output filename"
+  echo "#"
+  echo "function download_media()"
+  echo "{"
+  echo "  # get base name"
+  echo "  local readonly BNAME=\$(basename \"\$1\")"
+  echo
+  echo "  # show progress"
+  echo "  infomsg \"downloading media: \$BNAME\""
+  echo
+  echo "  # download media"
+  echo "  wget --no-verbose    \\"
+  echo "       --show-progress \\"
+  echo "       --continue      \\"
+  echo "       --user-agent=\"\" \\"
+  echo "       --timeout=\"60\"  \\"
+  echo "       -O \"\$2\"         \\"
+  echo "       \"\$1\"            \\"
+  echo "       2>&1"
+  echo
+  echo "  # check exit status"
+  echo "  if (( \$? != 0 )) ; then"
+  echo
+  echo "    # notify user"
+  echo "    failmsg \"download not finished: \$BNAME\""
+  echo
+  echo "    # signalize trouble"
+  echo "    return 1"
+  echo
+  echo "  fi"
+  echo
+  echo "  # show progress"
+  echo "  donemsg \"media downloaded: \$2\""
+  echo
+  echo "  # signalize success"
+  echo "  return 0"
+  echo "}"
+  echo
+  echo "# ---------"
+  echo "# exit_code"
+  echo "# ---------"
+  echo "#"
+  echo "#"
+  echo "#"
+  echo "function exit_code()"
+  echo "{"
+  echo "  # split path"
+  echo "  local DNAME=\$(dirname \"\$0\" | sed -re \"s|.+|&/| ; s|//\$|/|\")"
+  echo "  local BNAME=\$(basename \"\$0\")"
+  echo
+  echo "  # set final filename"
+  echo "  local BFINAL=\$(sed -nre \"s|(.+)\\.([^\\.]+)\$|\\1.\$GLOBAL_FINALTAG|p\" <<< \"\$BNAME\")"
+  echo "  local PFINAL=\"\$DNAME\$BFINAL\""
+  echo
+  echo "  # rename this file"
+  echo "  mv --force \"\$0\" \"\$PFINAL\" &>\"/dev/null\""
+  echo "}"
+  echo
+  echo "# ------------------------------------------------------------------------------"
+  echo "# commands                                                              commands"
+  echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# initialize the final tag for this file"
+  echo "GLOBAL_FINALTAG=\"pull\""
+  echo
+  echo "# clean up on exit"
+  echo "trap 'exit_code' EXIT"
+  echo
+  echo "# check target directory"
+  echo "if [ ! -d \"\$OUT_DIR\" ] ; then"
+  echo
+  echo "  # try to create target directory"
+  echo "  mkdir -p \"\$OUT_DIR\" 2>\"/dev/null\""
+  echo
+  echo "  # target directory still missing"
+  echo "  if [ ! -d \"\$OUT_DIR\" ] ; then"
+  echo
+  echo "    # notify user"
+  echo "    failmsg \"unable to create target directory: \\\"\$OUT_DIR\\\"\""
+  echo
+  echo "    # signalize trouble"
+  echo "    exit 1"
+  echo
+  echo "  fi"
+  echo
+  echo "fi"
+  echo
+  echo "# try to download media file"
+  echo "if ! download_media \"\$WEB_SRC\" \"\$OUT_DIR\$OUT_MP3\" ; then"
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
+  echo
+  echo "# create related cfg file"
+  echo "{"
+  echo
+  echo "  echo \"GENRE=\$CFG_GENRE\""
+  echo "  echo \"ARTIST=\$CFG_ARTIST\""
+  echo "  echo \"ALBUM=\$CFG_ALBUM\""
+  echo "  echo \"YEAR=\$CFG_YEAR\""
+  echo "  echo"
+  echo "  echo \"TITLE=\$CFG_TITLE\""
+  echo "  echo"
+  echo "  echo \"AUTHOR=\$CFG_AUTHOR\""
+  echo "  echo \"COMMENT=\$CFG_COMMENT\""
+  echo "  echo \"AIRTIME=\$CFG_AIRTIME\""
+  echo "  echo \"SORTKEY=\$CFG_SORTKEY\""
+  echo "  echo \"WEBSOURCE=\$WEB_SRC\""
+  echo "  echo"
+  echo "  echo \"BACKGROUND=\$CFG_BACKGROUND\""
+  echo "  echo \"FOREGROUND=\$CFG_FOREGROUND\""
+  echo "  echo \"COMPRESSION=\$CFG_COMPRESSION\""
+  echo "  echo \"TOPDIR=\$CFG_TOPDIR\""
+  echo "  echo"
+  echo
+  echo "  # add ID3 tags"
+  echo "  eyeD3 --verbose          \\"
+  echo "        --no-color         \\"
+  echo "        \"\$OUT_DIR\$OUT_MP3\" \\"
+  echo "        2>\"/dev/null\"      \\"
+  echo "  | sed -re \"s/.+/# &/\""
+  echo
+  echo "} > \"\$OUT_DIR\$OUT_CFG\""
+  echo
+  echo "# update the final tag for this file"
+  echo "GLOBAL_FINALTAG=\"done\""
+  echo
+  echo "# signalize success"
+  echo "exit 0"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# check number of parameters
+if (( $# != 1 )) ; then
+
+  # notify user
+  failmsg "exactly one source file needed: $(basename "$0") <filename>"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# set feed filename
+readonly FEED_FILE="$1"
+
+# check file
+if [ ! -f "$FEED_FILE" ] ; then
+
+  # notify user
+  failmsg "unable to locate file: \"$FEED_FILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check target directory
+if [ ! -d "$PULLDIR" ] ; then
+
+  # try to create target directory
+  mkdir -p "$PULLDIR" 2>"/dev/null"
+
+  # target directory still missing
+  if [ ! -d "$PULLDIR" ] ; then
+
+    # notify user
+    failmsg "unable to create target directory: \"$PULLDIR\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+fi
+
+# assert db file is present
+touch "$DBFILE"
+
+# check db file
+if [ ! -f "$DBFILE" ] ; then
+
+  # notify user
+  failmsg "unable to locate db file: \"$DBFILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# get feed title once and convert text to ASCII
+readonly FEED_TITLE=$(get_feed_title "$FEED_FILE" | ./fn.utf82ascii)
+
+# check title
+if [ -z "$FEED_TITLE" ] ; then
+
+  # notify user
+  failmsg "unable to extract feed name: \"$FEED_FILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# read all items from feed file
+while true
+do
+
+  # read data from first item and convert text to ASCII
+        MEDIA=$(get_episode_media       "$FEED_FILE"                  )
+        TITLE=$(get_episode_title       "$FEED_FILE" | ./fn.utf82ascii)
+       AUTHOR=$(get_episode_author      "$FEED_FILE" | ./fn.utf82ascii)
+         DATE=$(get_episode_date        "$FEED_FILE"                  )
+  DESCRIPTION=$(get_episode_description "$FEED_FILE" | ./fn.utf82ascii)
+
+  # no more data
+  [ -z "$MEDIA" ] && break
+
+  # title is needed
+  if [ -z "$TITLE" ] ; then
+
+    # notify user
+    failmsg "no TITLE found in $MEDIA"
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # date is needed
+  if [ -z "$DATE"  ] ; then
+
+    # notify user
+    failmsg "no DATE found in $MEDIA"
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # use own format
+  UTC_DATE=$(date -d "$DATE" -u +"%Y-%m-%d %H:%M:%S %Z" 2>"/dev/null")
+
+  # check own format
+  if [ -z "$UTC_DATE" ] ; then
+
+    # notify user
+    failmsg "unable to convert date: $DATE"
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # additional data missing
+  [ -z "$AUTHOR"      ] && warnmsg "no AUTHOR found in $MEDIA"
+  [ -z "$DESCRIPTION" ] && warnmsg "no DESCRIPTION found in $MEDIA"
+
+  # set filenames
+  PULLCORE=$(simplify <<< "$FEED_TITLE $UTC_DATE $TITLE" | sed -re "s/^(.{224}).+/\1/")
+  PULLFILE="$PULLCORE.pull"
+
+  # check if pull file has already been created
+  if egrep -q "^$PULLFILE$" "$DBFILE" ; then
+
+    # notify user
+    infomsg "pull file has already been created: $PULLFILE"
+
+  else
+
+    # set pull information
+    PULL_WEB_SRC="$MEDIA"
+    PULL_OUT_DIR="../raw/"
+    PULL_OUT_MP3="$PULLCORE.mp3"
+    PULL_OUT_CFG="$PULLCORE.cfg"
+
+    # set cfg information
+    CFG_BACKGROUND=$(get_background_image "$FEED_TITLE")
+    CFG_FOREGROUND=$(get_foreground_image "$UTC_DATE")
+    CFG_COMPRESSION=$(get_image_compression "$FEED_TITLE")
+    CFG_TOPDIR=$(get_topdir "$FEED_TITLE")
+    CFG_GENRE="Speech"
+    CFG_ARTIST=$(get_artist "$FEED_TITLE")
+    CFG_ALBUM=$(get_album "$UTC_DATE")
+    CFG_YEAR=$(get_year "$UTC_DATE")
+    CFG_AUTHOR=$(get_author "$AUTHOR")
+    CFG_TITLE=$(get_title "$FEED_TITLE" "$TITLE" "$CFG_AUTHOR" "$UTC_DATE")
+    CFG_COMMENT="$DESCRIPTION"
+    CFG_AIRTIME="$UTC_DATE"
+    CFG_SORTKEY=$(simplify <<< "$(date -d "$UTC_DATE" +"%Y-%m-%d") $FEED_TITLE $(sec_to_midnight "$UTC_DATE")")
+
+    # create pull file
+    show_pull_file > "$PULLDIR$PULLFILE"
+
+    # set executable
+    chmod u+x "$PULLDIR$PULLFILE"
+
+    # add pull file to database
+    echo "$PULLFILE" >> "$DBFILE"
+
+    # show progress
+    donemsg "pull file created: $PULLFILE"
+
+  fi
+
+  # remove first item
+  drop_first_item "$FEED_FILE"
+
+done
+
+# newest episodes first
+sort -ro "$DBFILE" "$DBFILE"
+
+# signalize success
+exit 0
+
