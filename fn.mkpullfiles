@@ -1241,7 +1241,7 @@ function show_pull_file()
   echo "        --no-color         \\"
   echo "        \"\$OUT_DIR\$OUT_MP3\" \\"
   echo "        2>\"/dev/null\"      \\"
-  echo "  | utf82ascii\""
+  echo "  | utf82ascii             \\"
   echo "  | sed -re \"s/.+/# &/\""
   echo
   echo "} > \"\$OUT_DIR\$OUT_CFG\""

@@ -1,0 +1,476 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# arguments                                                            arguments
+# ------------------------------------------------------------------------------
+
+NUMBER="$1"
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+
+# set directories
+readonly NUMDIR='/home/xi/Musik/zahlen/'
+readonly SRCDIR='/home/xi/Musik/zahlen/src/'
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# ------
+# errmsg
+# ------
+#
+# This function prints a red error message via stderr.
+#
+function errmsg()
+{
+  # push to stderr
+  echo -e "\e[1;91m[ERROR]\e[0m $1" 1>&2
+}
+
+# -----------
+# get_integer
+# -----------
+#
+#
+#
+function get_integer()
+{
+  sed -nre 's/^(-?[[:digit:]]+)$/\1+0/p' <<< "$1" | bc 2>'/dev/null'
+}
+
+# -------
+# wav2mp3
+# -------
+#
+# $1  wav file
+# $2  mp3 file
+# $3  number
+#
+function wav2mp3()
+{
+  # create mp3 file
+  lame --silent               \
+       --strictly-enforce-ISO \
+       --noreplaygain         \
+       --cbr                  \
+       -b '128'               \
+       -h                     \
+       -p                     \
+       --id3v2-only           \
+       --ta 'Linguatec'       \
+       --tl 'Spoken Numbers'  \
+       --ty "`date +%Y`"      \
+       --tg 'Other'           \
+       --tn "$3"              \
+       --tt "$3"              \
+       "$1"                   \
+       "$2"
+}
+
+# --------------
+# create_silence
+# --------------
+#
+# $1  filename
+# $2  length (seconds)
+#
+function create_silence()
+{
+  sox -V0 \
+      -n  \
+      -b '24' -r '44100' -c '2' -e 'signed-integer' "$1" \
+      trim 0.000 "$2"
+}
+
+# ----------------------
+# remove_leading_silence
+# ----------------------
+#
+# $1  filename
+#
+function remove_leading_silence()
+{
+  # create temporary file
+  local TMP=$(mktemp --suffix='.wav')
+  
+  # remove leading silence from wav file
+  sox -V0 "$1" "$TMP" silence 1 0.1 -135d
+
+  # overwrite input file
+  mv "$TMP" "$1"
+}
+
+# -----------------------
+# remove_trailing_silence
+# -----------------------
+#
+# $1  filename
+#
+function remove_trailing_silence()
+{
+  # create temporary file
+  local TMP=$(mktemp --suffix='.wav')
+  
+  # remove only trailing silence from wav file
+  sox -V0 "$1" "$TMP" reverse silence 1 0.1 -135d reverse
+
+  # overwrite input file
+  mv "$TMP" "$1"
+}
+
+# -------------
+# splice_append
+# -------------
+#
+# $1  file to extend
+# $2  file to append
+#
+function splice_append()
+{
+  # create temporary file
+  local TMP=$(mktemp --suffix='.wav')
+
+  # insert $2 at the end of $1
+  sox -V0 "$1" "$2" "$TMP" splice $(soxi -D "$1"),0.02,0.01
+
+  # overwrite input file
+  mv "$TMP" "$1"
+}
+
+# -------------
+# rig_up_number
+# -------------
+#
+# $1  directory that holds the partial wav files
+# $2  wav file to create
+# $3  number
+#
+function rig_up_number()
+{
+  # name numbered arguments
+  WAVDIR="$1"
+  TARGET="$2"
+  FIGURE="$3"
+
+  # get involved filenames
+  if (( FIGURE == 0 )); then
+
+    # set filenames
+    FILE_TH=''
+    FILE_HN=''
+    FILE_TO='0.wav'
+
+  else
+
+    # split number
+    FILE_TH=$(bc <<< "$FIGURE/1000"     | sed -nre 's/^[123456789]$/&000.wav/p')
+    FILE_HN=$(bc <<< "$FIGURE%1000/100" | sed -nre 's/^[123456789]$/&00.wav/p')
+    FILE_TO=$(bc <<< "$FIGURE%100"      | sed -nre 's/^[123456789][[:digit:]]?$/&.wav/p')
+
+  fi
+
+  # insert source directory
+  FILE_TH=$(sed -re "s|.+|$WAVDIR&|" <<< "$FILE_TH")
+  FILE_HN=$(sed -re "s|.+|$WAVDIR&|" <<< "$FILE_HN")
+  FILE_TO=$(sed -re "s|.+|$WAVDIR&|" <<< "$FILE_TO")
+
+  # create temporary files
+  TEMPFILE_TH=$(mktemp --suffix='.wav')
+  TEMPFILE_HN=$(mktemp --suffix='.wav')
+  TEMPFILE_TO=$(mktemp --suffix='.wav')
+
+  # no filename given
+  if [ -z "$FILE_TH" ]; then
+
+    # create silence
+    create_silence "$TEMPFILE_TH" '0.080'
+
+  else
+
+    # create copy
+    cp -f "$FILE_TH" "$TEMPFILE_TH"
+
+    # more audio data to come
+    if [ -n "$TEMPFILE_HN" ] || [ -n "$TEMPFILE_TO" ]; then
+
+      # remove trailing silence from wav file
+      remove_trailing_silence "$TEMPFILE_TH"
+
+    fi
+
+  fi
+
+  # no filename given
+  if [ -z "$FILE_HN" ]; then
+
+    # create silence
+    create_silence "$TEMPFILE_HN" '0.080'
+
+  else
+
+    # create copy
+    cp -f "$FILE_HN" "$TEMPFILE_HN"
+
+    # preceding wav file present
+    if [ -n "$TEMPFILE_TH" ]; then
+
+      # remove leading silence from wav file
+      remove_leading_silence "$TEMPFILE_HN"
+
+    fi
+
+    # following wav file present
+    if [ -n "$TEMPFILE_TO" ]; then
+
+      # remove trailing silence from wav file
+      remove_trailing_silence "$TEMPFILE_HN"
+
+    fi
+
+  fi
+
+  # no filename given
+  if [ -z "$FILE_TO" ]; then
+
+    # create silence
+    create_silence "$TEMPFILE_TO" '0.080'
+
+  else
+
+    # create copy
+    cp -f "$FILE_TO" "$TEMPFILE_TO"
+
+    # some audio data already present
+    if [ -n "$TEMPFILE_TH" ] || [ -n "$TEMPFILE_HN" ]; then
+
+      # remove leading silence from wav file
+      remove_leading_silence "$TEMPFILE_TO"
+
+    fi
+
+  fi
+
+  # combine files
+  splice_append "$TEMPFILE_TH" "$TEMPFILE_HN"
+  splice_append "$TEMPFILE_TH" "$TEMPFILE_TO"
+
+  # remove expendable files
+  rm "$TEMPFILE_HN"
+  rm "$TEMPFILE_TO"
+
+  # create (overwrite) target file
+  mv "$TEMPFILE_TH" "$TARGET"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# set default value
+CREATEWAV='0'
+
+# check option
+if [ "$NUMBER" == '-w' ]; then
+
+  # set flag
+  CREATEWAV='1'
+
+  # drop first argument
+  shift
+
+  # update number
+  NUMBER="$1"
+
+fi
+
+# convert numeric argument
+NUMBER=$(get_integer "$NUMBER")
+
+# check number
+if [ -z "$NUMBER" ]; then
+
+  # notify user
+  errmsg 'invalid number given...'
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check range
+if (( NUMBER > 9999 )); then
+
+  # notify user
+  errmsg "number too large: $NUMBER"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check range
+if (( NUMBER < 0 )); then
+
+  # notify user
+  errmsg "number too small: $NUMBER"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# create wav file
+if (( CREATEWAV == 1 )); then
+
+  # compile wav name
+  WAVFILE="$NUMDIR$NUMBER.wav"
+
+  # check if wav file is already present
+  if [ -f "$WAVFILE" ]; then
+
+    # show path
+    echo "$WAVFILE"
+
+    # signalize success
+    exit 0
+
+  fi
+
+  # compile name of source file
+  SRCFILE="$SRCDIR$NUMBER.wav"
+
+  # check if source file is already present
+  if [ -f "$SRCFILE" ]; then
+
+    # create copy
+    cp -f "$SRCFILE" "$WAVFILE"
+
+    # check if wav file is present now
+    if [ -f "$WAVFILE" ]; then
+
+      # show path
+      echo "$WAVFILE"
+
+      # signalize success
+      exit 0
+
+    else
+
+      # notify user
+      errmsg "unable to create wav file: \"$WAVFILE\""
+
+      # signalize trouble
+      exit 1
+
+    fi
+
+  fi
+
+  # rig up missing number
+  rig_up_number "$SRCDIR" "$WAVFILE" "$NUMBER"
+
+  # check if wav file is present now
+  if [ -f "$WAVFILE" ]; then
+
+    # show path
+    echo "$WAVFILE"
+
+    # signalize success
+    exit 0
+
+  else
+
+    # notify user
+    errmsg "unable to create wav file: \"$WAVFILE\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+# create mp3 file
+else
+
+  # compile mp3 name
+  MP3FILE="$NUMDIR$NUMBER.mp3"
+
+  # check if mp3 file is already present
+  if [ -f "$MP3FILE" ]; then
+
+    # show path
+    echo "$MP3FILE"
+
+    # signalize success
+    exit 0
+
+  fi
+
+  # compile name of source file
+  SRCFILE="$SRCDIR$NUMBER.wav"
+
+  # check if source file is already present
+  if [ -f "$SRCFILE" ]; then
+
+    # create missing mp3 file
+    wav2mp3 "$SRCFILE" "$MP3FILE" "$NUMBER"
+
+    # check if mp3 file is present now
+    if [ -f "$MP3FILE" ]; then
+
+      # show path
+      echo "$MP3FILE"
+
+      # signalize success
+      exit 0
+
+    else
+
+      # notify user
+      errmsg "unable to create mp3 file: \"$MP3FILE\""
+
+      # signalize trouble
+      exit 1
+
+    fi
+
+  fi
+
+  # create temporary file
+  RIGNUM=$(mktemp --suffix='.wav')
+
+  # rig up missing number
+  rig_up_number "$SRCDIR" "$RIGNUM" "$NUMBER"
+
+  # create missing mp3 file
+  wav2mp3 "$RIGNUM" "$MP3FILE" "$NUMBER"
+
+  # remove expendable files
+  rm "$RIGNUM"
+
+  # check if mp3 file is present now
+  if [ -f "$MP3FILE" ]; then
+
+    # show path
+    echo "$MP3FILE"
+
+    # signalize success
+    exit 0
+
+  else
+
+    # notify user
+    errmsg "unable to create mp3 file: \"$MP3FILE\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+fi
+
+# signalize trouble
+exit 1
+
