@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# regular expressions
+readonly D2="[[:digit:]]{2}"
+readonly D3="[[:digit:]]{3}"
+readonly D4="[[:digit:]]{4}"
+
+# sort by date
+sed --regexp-extended \
+    --expression="
+
+      # duplicate path and separate with 'unit separator'
+      s/.+/&\x1F&/
+
+      # ante Christum
+      s/^.+\/${D3}_ac_(${D4}_${D2}_${D2}).+(\x1F.+)/-\1_\2/
+
+      # post Christum
+      s/^.+\/${D3}_pc_(${D4}_${D2}_${D2}).+(\x1F.+)/+\1_\2/
+
+    "                        \
+| sort --field-separator="_" \
+       --key "1,1g"          \
+       --key "2,2g"          \
+       --key "3,3g"          \
+       --key "4,4"           \
+| sed --regexp-extended      \
+      --expression="
+
+        # remove duplicated part
+        s/^.+\x1F//
+
+      " \
+| uniq
+
+# signalize success
+exit 0
+

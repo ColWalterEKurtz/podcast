@@ -1,0 +1,164 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# parameters                                                          parameters
+# ------------------------------------------------------------------------------
+
+PLAYLIST="$1"
+TARGETDIR="$2"
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+
+# some common sed commands
+readonly SED_MAXLEN='/.{2049}/d'
+readonly SED_NOCOMM='/^[[:space:]]*#/d'
+readonly SED_ESCINS='s/:/:c/g; s/ /:s/g; s/\x09/:t/g; s/\\/:b/g'
+readonly SED_ESCDEL='s/:b/\\/g; s/:t/\x09/g; s/:s/ /g; s/:c/:/g'
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# ------
+# errmsg
+# ------
+#
+# This function prints a red error message via stderr.
+#
+function errmsg()
+{
+  # push to stderr
+  echo -e "\e[1;91m[ERROR]\e[0m $1" 1>&2
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# set default value
+ADDREPLAYGAIN=0
+
+# check if 'ReplayGain' option is given
+if [ "$PLAYLIST" == '-r' ]; then
+
+  # update flag
+  ADDREPLAYGAIN=1
+
+  # drop option
+  shift
+
+  # update values
+  PLAYLIST="$1"
+  TARGETDIR="$2"
+
+fi
+
+# check playlist
+if [ "$PLAYLIST" == ''       ] \
+|| [ "$PLAYLIST" == '-h'     ] \
+|| [ "$PLAYLIST" == '--help' ] ; then
+
+  echo
+  echo 'plcopy [-r] <playlist.m3u> [<target dir>]'
+  echo
+  echo ' -r  add ReplayGain to copied mp3 files'
+  echo
+  exit 1
+
+fi
+
+# format directory
+TARGETDIR=$(sed -re 's|/+$||; s|.+|&/|; s|^\./$||' <<< "$TARGETDIR")
+
+# check file
+if [ ! -f "$PLAYLIST" ]; then
+
+  # notify user
+  errmsg "unable to open file: \"$PLAYLIST\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check directory
+if [ ! -d "$TARGETDIR" ]; then
+
+  # notify user
+  errmsg "unable to locate directory: \"$TARGETDIR\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# use this number as part of the new filename
+NAMEINDEX=0
+
+# read lines from text file
+while read ESCLINE
+do
+
+  # remove inserted escape sequences and skip comments
+  FILENAME=$(sed -re "$SED_ESCDEL; $SED_NOCOMM" <<< "$ESCLINE")
+
+  # skip empty lines
+  [ -z "$FILENAME" ] && continue
+
+  # check given path
+  if [ ! -f "$FILENAME" ]; then
+
+    # notify user
+    errmsg "unable to locate file: \"$FILENAME\""
+
+    # next file
+    continue
+
+  fi
+
+  # increase counter
+  (( NAMEINDEX += 1 ))
+
+  # get extension
+  EXTENSION=$(basename "$FILENAME" | sed -nre 's/.*(\.[^\.]+)$/\L\1/p')
+
+  # compile new filename
+  NEWNAME=$(printf '%s%05d%s' "$TARGETDIR" "$NAMEINDEX" "$EXTENSION")
+
+  # show progress
+  echo "$NEWNAME  <--  $(basename "$FILENAME")"
+
+  # copy file
+  cp --no-clobber "$FILENAME" "$NEWNAME"
+
+done < <(sed -re "$SED_MAXLEN; $SED_ESCINS" "$PLAYLIST")
+
+# normalize mp3 files (track gain)
+if (( ADDREPLAYGAIN == 1 )); then
+
+  # use current directory as default
+  [ -z "$TARGETDIR" ] && TARGETDIR="`pwd`"
+
+  # normalize mp3 files (track gain)
+  find "$TARGETDIR"                \
+       -maxdepth '1'               \
+       -type 'f'                   \
+       -regextype 'posix-extended' \
+       -regex '.+\.[Mm][Pp]3$'     \
+       -print0                     \
+  | sort --zero-terminated         \
+  | while read -rd $'\0' FILENAME
+  do
+
+    # this will create an ID3v2.4 tag
+    mp3gain -c -T -r -s i "$FILENAME"
+
+  done
+
+fi
+
+# signalize success
+exit 0
+

@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+
+# search mp3 files recursively in this directory
+ZZDIR='/home/xi/podcast/audio/ZeitZeichen/'
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# ----------
+# chron_find
+# ----------
+#
+# 001_pc_1785_01_01_die_englische_tageszeitung_the_times_erscheint_zum_ersten_mal_sendung_1_januar_2010.mp3
+#
+function chron_find()
+{
+  readonly D2='[[:digit:]]{2}'
+  readonly D3='[[:digit:]]{3}'
+  readonly D4='[[:digit:]]{4}'
+
+  find "$ZZDIR"                                                   \
+       -type 'f'                                                  \
+       -regextype 'posix-extended'                                \
+       -regex '.+\.[Mm][Pp]3$'                                    \
+  | sed --regexp-extended                                         \
+        -e 's|.+|&\o37&|'                                         \
+        -e "s|^.+/${D3}_ac_(${D4}_${D2}_${D2}).+(\o37.+)|-\1_\2|" \
+        -e "s|^.+/${D3}_pc_(${D4}_${D2}_${D2}).+(\o37.+)|+\1_\2|" \
+  | sort -t '_' -k '1,1g' -k '2,2g' -k '3,3g' -k '4,4'            \
+  | sed -re 's|^.+\o37||'
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# no fakes
+if [ "$1" == "-f" ] ; then
+
+  if [ -z "$3" ] ; then
+
+    chron_find | grep -Ev "_1_april_|_31_dezember_" | grep -E --color -- "$2"
+
+  else
+
+    chron_find | grep -Ev "_1_april_|_31_dezember_" | grep -Ev -- "$3" | grep -E --color -- "$2"
+
+  fi
+
+# all episodes
+else
+
+  if [ -z "$2" ] ; then
+
+    chron_find | grep -E --color -- "$1"
+
+  else
+
+    chron_find | grep -Ev -- "$2" | grep -E --color -- "$1"
+
+  fi
+
+fi
+
+# signalize success
+exit 0
+

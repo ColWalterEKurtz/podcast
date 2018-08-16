@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# get episodes
+{
+  # all events from 1300 to 1499
+  ./zzgrep -f  "_pc_1[34]"        \
+  | grep -Ev "geburtstag|geboren" \
+  | grep -Ev "todestag|gestorben"
+
+  # all birthdays from 1280 to 1450
+  ./zzgrep -f "_pc_(12[89]|13|14[01234]|1450)" \
+  | grep -E "geburtstag|geboren"
+
+  # all obits from 1350 to 1520
+  ./zzgrep -f "_pc_(13[56789]|14|15[01]|1520)" \
+  | grep -E "todestag|gestorben"
+} \
+> "auto.m3u"
+
+# insert numbers
+./numins "auto.m3u" \
+> "auto_num.m3u"
+
+# show result
+nl "auto.m3u"
+
+# signalize success
+exit 0
+

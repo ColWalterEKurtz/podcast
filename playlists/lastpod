@@ -29,6 +29,10 @@ readonly MAGENTA=$(tput setaf 5)
 readonly    CYAN=$(tput setaf 6)
 readonly   WHITE=$(tput setaf 7)
 
+# filenames
+readonly PLIST="last100.m3u"
+readonly NLIST="last100num.m3u"
+
 # ------------------------------------------------------------------------------
 # functions                                                            functions
 # ------------------------------------------------------------------------------
@@ -85,62 +89,58 @@ function donemsg()
 # commands                                                              commands
 # ------------------------------------------------------------------------------
 
-# make skip work only for these files
-CFGFILE="raw/wdr_zeitzeichen_2018_08_16_07_45_45_utc_rudolf_schulten_kernphysiker_geburtstag_16_08_1923.cfg"
-MP3FILE="raw/wdr_zeitzeichen_2018_08_16_07_45_45_utc_rudolf_schulten_kernphysiker_geburtstag_16_08_1923.mp3"
+# call daily100 to create basic playlist
+if ! ./daily100 "$@" > "$PLIST" ; then
 
-# check cfg file
-if [ ! -f "$CFGFILE" ] ; then
-
-  # notify user
-  failmsg "unable to locate file: \"$CFGFILE\""
-
-  # signalize trouble
-  exit 1
-
-fi
-
-# check mp3 file
-if [ ! -f "$MP3FILE" ] ; then
-
-  # notify user
-  failmsg "unable to locate file: \"$MP3FILE\""
-
-  # signalize trouble
+  # stop here
   exit 1
 
 fi
 
 # show progress
-infomsg "operating file: $CFGFILE"
+donemsg "file created: $PLIST"
 
-# set name of the target directory
-readonly SKIPDIR="skipped/"
+# insert numbers
+./numins "$PLIST" > "$NLIST"
 
-# check if target directory is present
-if [ ! -d "$SKIPDIR" ] ; then
+# show progress
+donemsg "file created: $NLIST"
 
-  # try to create target directory
-  mkdir -p "$SKIPDIR" 2>"/dev/null"
+# check these mounting points
+for USBSTICK in          \
+  "/media/xi/4GB-FAT32"  \
+  "/media/xi/16GB-FAT32" \
+  ;
+do
 
-  # target directory is still missing
-  if [ ! -d "$SKIPDIR" ] ; then
+  # check if directory exists
+  if [ -d "$USBSTICK" ]; then
+
+    # set name of target directory
+    TDIR=$(date +"$USBSTICK/%Y-%m-%d")
 
     # notify user
-    failmsg "unable to create target directory: \"$SKIPDIR\""
+    infomsg "device found: $USBSTICK"
 
-    # signalize trouble
-    exit 1
+    # remove target directory
+    rm -rf "$TDIR"
+
+    # create target directory
+    mkdir --parents "$TDIR"
+
+    # copy podcasts
+    ./plcopy "$NLIST" "$TDIR"
+
+    # notify user
+    donemsg "files copied to: $TDIR"
+
+    # exit loop
+    break
 
   fi
 
-fi
-
-# move files to skip directory
-mv -f -t "$SKIPDIR" "$CFGFILE" "$MP3FILE"
-
-# show progress
-donemsg "file skipped: $MP3FILE"
+done
 
 # signalize success
 exit 0
+

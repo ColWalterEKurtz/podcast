@@ -1,0 +1,346 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# filenames
+readonly PLIST="last100.m3u"
+readonly NLIST="last100num.m3u"
+
+# the root directory for all audio files
+readonly TOPDIR="$HOME/podcast/audio"
+
+# this file holds all 'SORTKEY-filename' pairs
+readonly KEYFILE="keyfile"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# -----------
+# findlastmod
+# -----------
+#
+#
+#
+function findlastmod()
+{
+  # find all files and sort them by modification time
+  find "$@"                     \
+       -type "f"                \
+       -printf "%TY%Tj%TT@%p\n" \
+       2>"/dev/null"            \
+  | sort                        \
+  | sed -re "s/^[^@]*@(\.\/)?//"
+}
+
+# --------
+# get_keys
+# --------
+#
+# ... | get_keys | ...
+#
+function get_keys()
+{
+  sed --quiet                    \
+      --regexp-extended          \
+      --expression="
+
+        # Filename: /home/xi/podcast/audio/ComKom/2018_08_august/013_info_update_11_08_2018_stang_michael_11_august_2018.mp3
+        /^Filename:/ {
+
+          # remove tag
+          s/^[^[:space:]]+[[:space:]]//
+
+          # copy pattern space to hold space
+          h
+
+          # next line
+          b
+        }
+
+        # TXXX: (SORTKEY): 2018_08_11_computer_und_kommunikation_beitraege_deutschlandfunk_32883
+        /^TXXX: \(SORTKEY\):/ {
+
+          # remove tag
+          s/^[^[:space:]]+[[:space:]]//
+          s/^[^[:space:]]+[[:space:]]//
+
+          # append hold space to pattern space
+          G
+
+          # concatenate lines
+          s/\x0A/ /
+
+          # print SORTKEY and filename
+          p
+        }
+      "
+}
+
+# ----------------------
+# create_initial_keyfile
+# ----------------------
+#
+#
+#
+function create_initial_keyfile()
+{
+  find "$TOPDIR"                   \
+       -type "f"                   \
+       -regextype "posix-extended" \
+       -regex ".+\.[Mm][Pp]3$"     \
+       -print0                     \
+       2>"/dev/null"               \
+  | sort -z                        \
+  | xargs -0 -L1 id3v2 -R          \
+  | get_keys                       \
+  | sort -ruo "$KEYFILE"
+}
+
+# --------------
+# update_keyfile
+# --------------
+#
+#
+#
+function update_keyfile()
+{
+  # createtemporary file
+  local TEMPFILE=$(mktemp --suffix=".update-keyfile")
+
+  # find files newer than KEYFILE
+  find "$TOPDIR"                   \
+       -type "f"                   \
+       -regextype "posix-extended" \
+       -regex ".+\.[Mm][Pp]3$"     \
+       -newer "$KEYFILE"           \
+       -print0                     \
+       2>"/dev/null"               \
+  | sort -z                        \
+  | xargs -0 -L1 id3v2 -R          \
+  | get_keys                       \
+  > "$TEMPFILE"
+
+  # append new keys
+  cat "$TEMPFILE" >> "$KEYFILE"
+
+  # remove temporary file
+  rm -f "$TEMPFILE" 2>"/dev/null"
+
+  # sort new key file
+  sort -ruo "$KEYFILE" "$KEYFILE"
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# set default value (all episodes)
+EPISODES="bcdfhaeksz"
+
+if (( $# == 1 )) ; then
+
+  # show help
+  if [ "$1" == "-h" ] ; then
+
+    # show help via stderr
+    {
+
+      echo
+      echo "  daily100 [-h|bcdfhaeksz]"
+      echo
+      echo "  -h   show help and exit"
+      echo
+      echo "   b   search Brennpunkt/        directory"
+      echo "   c   search ComKom/            directory"
+      echo "   d   search Dossier/           directory"
+      echo "   f   search Forschung/         direktory"
+      echo "   h   search Hintergrund/       directory"
+      echo "   a   search Kulturfragen/      directory"
+      echo "   e   search Kulturpresseschau/ directory"
+      echo "   k   search KuSoWi/            directory"
+      echo "   s   search Sternzeit/         directory"
+      echo "   z   search ZeitZeichen/       directory"
+      echo
+      echo "   default is: $EPISODES"
+      echo
+
+    } 1>&2
+
+    # stop here
+    exit 1
+
+  else
+
+    # use given argument
+    EPISODES="$1"
+
+  fi
+
+elif (( $# > 1 )) ; then
+
+  # notify user
+  failmsg "at most one argument allowed"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check if key file is missing or gempty
+if [ ! -s "$KEYFILE" ] ; then
+
+  # show progress
+  infomsg "creating initial key file..."
+
+  # create file
+  create_initial_keyfile
+
+else
+
+  # show progress
+  infomsg "updating key file..."
+
+  # update file
+  update_keyfile
+
+fi
+
+# check if key file is still missing or gempty
+if [ ! -s "$KEYFILE" ] ; then
+
+  # notify user
+  failmsg "missing or empty key file: \"$KEYFILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+declare -A REGEXP
+REGEXP[b]="/Brennpunkt/"
+REGEXP[c]="/ComKom/"
+REGEXP[d]="/Dossier/"
+REGEXP[f]="/Forschung/"
+REGEXP[h]="/Hintergrund/"
+REGEXP[a]="/Kulturfragen/"
+REGEXP[e]="/Kulturpresseschau/"
+REGEXP[k]="/KuSoWi/"
+REGEXP[s]="/Sternzeit/"
+REGEXP[z]="/ZeitZeichen/"
+
+SEARCHEXP=""
+
+# create search expression
+for (( INDEX=0 ; INDEX<${#EPISODES} ; INDEX++ ))
+do
+
+  # get regular expression to append
+  APPEND="${REGEXP[${EPISODES:$INDEX:1}]}"
+
+  if [ -n "$SEARCHEXP" ] ; then
+
+    SEARCHEXP="$SEARCHEXP|$APPEND"
+
+  else
+
+    SEARCHEXP="$APPEND"
+
+  fi
+
+done 2>"/dev/null"
+
+# check expression
+if [ -z "$SEARCHEXP" ] ; then
+
+  # notify user
+  failmsg "empty search expression"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# show (at most) first 100 episodes
+egrep "$SEARCHEXP" "$KEYFILE" \
+| head -n "100"               \
+| sed -re "s/^[^[:space:]]+[[:space:]]+//"
+
+# signalize success
+exit 0
+

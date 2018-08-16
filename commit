@@ -224,8 +224,8 @@ function create_cover_image()
 # ------------------------------------------------------------------------------
 
 # make commit work only for these files
-CFGFILE="raw/kulturfragen_deutschlandfunk_2018_04_29_15_05_00_utc_diskussion_um_bodenreform_ein_anderes_verhaeltnis_zu_eigentumsrechten.cfg"
-MP3FILE="raw/kulturfragen_deutschlandfunk_2018_04_29_15_05_00_utc_diskussion_um_bodenreform_ein_anderes_verhaeltnis_zu_eigentumsrechten.mp3"
+CFGFILE="raw/wdr_zeitzeichen_2018_08_16_07_45_45_utc_rudolf_schulten_kernphysiker_geburtstag_16_08_1923.cfg"
+MP3FILE="raw/wdr_zeitzeichen_2018_08_16_07_45_45_utc_rudolf_schulten_kernphysiker_geburtstag_16_08_1923.mp3"
 
 # check cfg file
 if [ ! -f "$CFGFILE" ] ; then

@@ -1,0 +1,183 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# parameters                                                          parameters
+# ------------------------------------------------------------------------------
+
+PLAYLIST="$1"
+STARTNUM="$2"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# ------
+# errmsg
+# ------
+#
+# This function prints a red error message via stderr.
+#
+function errmsg()
+{
+  # push to stderr
+  echo -e "\e[1;91m[ERROR]\e[0m $1" 1>&2
+}
+
+# ----
+# catz
+# ----
+#
+# ... | catz | ...
+#
+function catz()
+{
+  # replace all '[CR]?[NL]' sequences with [NUL]
+  # skip empty lines
+  sed -ze 's/\o15\?\o12/\o0/g' |
+  sed -ze '/^[[:space:]]*$/d'
+}
+
+# -----------
+# get_integer
+# -----------
+#
+#
+#
+function get_integer()
+{
+  sed -nre 's/^(-?[[:digit:]]+)$/\1+0/p' <<< "$1" | bc 2>'/dev/null'
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# set default value
+USEWAV='0'
+
+# check option
+if [ "$PLAYLIST" == '-w' ]; then
+
+  # update flag
+  USEWAV='1'
+
+  # drop first srgument
+  shift
+
+  # update arguments
+  PLAYLIST="$1"
+  STARTNUM="$2"
+
+fi
+
+# check file
+if [ ! -f "$PLAYLIST" ]; then
+
+  # notify user
+  errmsg "unable to open file: \"$PLAYLIST\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check start number
+if [ -z "$STARTNUM" ]; then
+
+  # set default value
+  STARTNUM='1'
+
+fi
+
+# the title's position
+TRACKNUMBER=$(get_integer "$STARTNUM")
+
+# check track number
+if [ -z "$TRACKNUMBER" ]; then
+
+  # notify user
+  errmsg "invalid track number: \"$TRACKNUMBER\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# to buffer the comment that has been extractet most recently
+EXTINFBUFFER=''
+
+# read lines
+while read -rd $'\0' FILENAME
+do
+
+  # check if the header line is read
+  if [ "$FILENAME" == '#EXTM3U' ]; then
+
+    # show header
+    echo '#EXTM3U'
+
+    # but don't increase counter
+    continue
+  
+  fi
+
+  # check if an empty line is read
+  if [ -z "$FILENAME" ]; then
+
+    # show empty line
+    echo
+
+    # but don't increase counter
+    continue
+  
+  fi
+
+  # check if a comment is read
+  if [ "${FILENAME:0:7}" == '#EXTINF' ]; then
+
+    # buffer comment
+    EXTINFBUFFER="$FILENAME"
+
+    # but don't increase counter
+    continue
+  
+  fi
+
+  # check flag
+  if (( USEWAV == 1 )); then
+
+    # get spoken number (wav version)
+    SPEECHFILE=$(getnumber -w "$TRACKNUMBER")
+  
+  else
+
+    # get spoken number (mp3 version)
+    SPEECHFILE=$(getnumber "$TRACKNUMBER")
+
+  fi
+
+  # show speech number
+  echo "#EXTINF:-1,$TRACKNUMBER"
+  echo "$SPEECHFILE"
+
+  # check buffer
+  if [ -n "$EXTINFBUFFER" ]; then
+
+    # show comment
+    echo "$EXTINFBUFFER"
+
+  fi
+
+  # show filename
+  echo "$FILENAME"
+
+  # reset buffer
+  EXTINFBUFFER=''
+
+  # increase counter
+  (( TRACKNUMBER += 1 ))
+
+done < <(catz < "$PLAYLIST")
+
+exit 0
+

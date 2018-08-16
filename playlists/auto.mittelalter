@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# get episodes from 05xx to 14xx
+./zzgrep -f                         \
+| grep -E "_pc_(0[56789]|1[01234])" \
+> "auto.m3u"
+
+# insert numbers
+./numins "auto.m3u" \
+> "auto_num.m3u"
+
+# show result
+nl "auto.m3u"
+
+# signalize success
+exit 0
+

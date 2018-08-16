@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# get episodes
+{
+  # all events from 1789 to 1918
+  ./zzgrep -f  "_pc_(1789|179|18|190|191[012345678])" \
+  | grep -Ev "geburtstag|geboren"                     \
+  | grep -Ev "todestag|gestorben"
+
+  # all birthdays from 1770 to 1870
+  ./zzgrep -f "_pc_(17[789]|18[0123456]|1870)" \
+  | grep -E "geburtstag|geboren"
+
+  # all obits from 1830 to 1930
+  ./zzgrep -f "_pc_(18[3456789]|19[012]|1930)" \
+  | grep -E "todestag|gestorben"
+} \
+| grep -Ev "_des(_.+)?_malers_"           \
+| grep -Ev "_der(_.+)?_malerin_"          \
+| grep -Ev "_des(_.+)?_komponisten_"      \
+| grep -Ev "_der(_.+)?_komponistin_"      \
+| grep -Ev "_des(_.+)?_autors_"           \
+| grep -Ev "_der(_.+)?_autorin_"          \
+| grep -Ev "_des(_.+)?_schriftstellers_"  \
+| grep -Ev "_der(_.+)?_schriftstellerin_" \
+| grep -Ev "_des(_.+)?_dichters_"         \
+| grep -Ev "_der(_.+)?_dichterin_"        \
+| grep -Ev "_des(_.+)?_schauspielers"     \
+| grep -Ev "_der(_.+)?_schauspielerin"    \
+| grep -Ev "_urauffuehrung_"              \
+| ./zzsort                                \
+> "auto.m3u"
+
+# insert numbers
+./numins "auto.m3u" \
+> "auto_num.m3u"
+
+# show result
+nl "auto.m3u"
+
+# signalize success
+exit 0
+
