@@ -88,29 +88,64 @@ function donemsg()
   echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
 }
 
-# --------------
-# get_month_name
-# --------------
+# ----------
+# utf82ascii
+# ----------
 #
-# returns the name of the passed month
+# ... | utf82ascii | ...
 #
-function get_month_name()
+function utf82ascii()
 {
-  case "$1" in
-  "1")  echo "Januar"    ;;
-  "2")  echo "Februar"   ;;
-  "3")  echo "Maerz"     ;;
-  "4")  echo "April"     ;;
-  "5")  echo "Mai"       ;;
-  "6")  echo "Juni"      ;;
-  "7")  echo "Juli"      ;;
-  "8")  echo "August"    ;;
-  "9")  echo "September" ;;
-  "10") echo "Oktober"   ;;
-  "11") echo "November"  ;;
-  "12") echo "Dezember"  ;;
-  *)    echo ""          ;;
-  esac
+  sed --regexp-extended \
+      --expression="
+
+        # escape all colons
+        s/:/:c/g
+
+        # escape all native question marks (iconv may introduce much more)
+        s/\\?/:q/g
+
+        # collection of characters that aren't translated (suitable) by iconv
+        s/¦/|/g
+        s/¡/!/g
+        s/¿/:q/g
+        s/„/\"/g
+        s/«/\"/g
+        s/»/\"/g
+        s/÷/\//g
+        s/±/+-/g
+        s/¹/^1/g
+        s/²/^2/g
+        s/³/^3/g
+        s/Ä/Ae/g
+        s/ä/ae/g
+        s/Ö/Oe/g
+        s/ö/oe/g
+        s/Ü/Ue/g
+        s/ü/ue/g
+        s/Ø/Oe/g
+        s/ø/oe/g
+        s/Ð/Dh/g
+        s/ð/dh/g
+        s/Þ/Th/g
+        s/þ/th/g
+
+      "                                       \
+  | iconv --from-code "UTF-8"                 \
+          --to-code "ASCII//TRANSLIT//IGNORE" \
+  | sed --regexp-extended                     \
+        --expression="
+
+          # remove all question marks introduced by iconv
+          s/\\?//g
+
+          # restore all escaped question marks
+          s/:q/?/g
+
+          # restore all escaped colons
+          s/:c/:/g
+
+        "
 }
 
 # --------
@@ -175,6 +210,31 @@ function sec_to_midnight()
 
   # push seconds to stdout
   bc <<< "86400 - ($HOR * 3600 + $MIN * 60 + $SEC)" | xargs printf "%05d\n"
+}
+
+# --------------
+# get_month_name
+# --------------
+#
+# returns the name of the passed month
+#
+function get_month_name()
+{
+  case "$1" in
+  "1")  echo "Januar"    ;;
+  "2")  echo "Februar"   ;;
+  "3")  echo "Maerz"     ;;
+  "4")  echo "April"     ;;
+  "5")  echo "Mai"       ;;
+  "6")  echo "Juni"      ;;
+  "7")  echo "Juli"      ;;
+  "8")  echo "August"    ;;
+  "9")  echo "September" ;;
+  "10") echo "Oktober"   ;;
+  "11") echo "November"  ;;
+  "12") echo "Dezember"  ;;
+  *)    echo ""          ;;
+  esac
 }
 
 # --------------
@@ -994,6 +1054,66 @@ function show_pull_file()
   echo "  echo -e \"\${GREEN}[DONE]\${NONE} \$1\" 1>&2"
   echo "}"
   echo
+  echo "# ----------"
+  echo "# utf82ascii"
+  echo "# ----------"
+  echo "#"
+  echo "# ... | utf82ascii | ..."
+  echo "#"
+  echo "function utf82ascii()"
+  echo "{"
+  echo "  sed --regexp-extended \\"
+  echo "      --expression=\""
+  echo
+  echo "        # escape all colons"
+  echo "        s/:/:c/g"
+  echo
+  echo "        # escape all native question marks (iconv may introduce much more)"
+  echo "        s/\\\\?/:q/g"
+  echo
+  echo "        # collection of characters that aren't translated (suitable) by iconv"
+  echo "        s/¦/|/g"
+  echo "        s/¡/!/g"
+  echo "        s/¿/:q/g"
+  echo "        s/„/\\\"/g"
+  echo "        s/«/\\\"/g"
+  echo "        s/»/\\\"/g"
+  echo "        s/÷/\\//g"
+  echo "        s/±/+-/g"
+  echo "        s/¹/^1/g"
+  echo "        s/²/^2/g"
+  echo "        s/³/^3/g"
+  echo "        s/Ä/Ae/g"
+  echo "        s/ä/ae/g"
+  echo "        s/Ö/Oe/g"
+  echo "        s/ö/oe/g"
+  echo "        s/Ü/Ue/g"
+  echo "        s/ü/ue/g"
+  echo "        s/Ø/Oe/g"
+  echo "        s/ø/oe/g"
+  echo "        s/Ð/Dh/g"
+  echo "        s/ð/dh/g"
+  echo "        s/Þ/Th/g"
+  echo "        s/þ/th/g"
+  echo
+  echo "      \"                                       \\"
+  echo "  | iconv --from-code \"UTF-8\"                 \\"
+  echo "          --to-code \"ASCII//TRANSLIT//IGNORE\" \\"
+  echo "  | sed --regexp-extended                     \\"
+  echo "        --expression=\""
+  echo
+  echo "          # remove all question marks introduced by iconv"
+  echo "          s/\\\\?//g"
+  echo
+  echo "          # restore all escaped question marks"
+  echo "          s/:q/?/g"
+  echo
+  echo "          # restore all escaped colons"
+  echo "          s/:c/:/g"
+  echo
+  echo "        \""
+  echo "}"
+  echo
   echo "# --------------"
   echo "# download_media"
   echo "# --------------"
@@ -1121,6 +1241,7 @@ function show_pull_file()
   echo "        --no-color         \\"
   echo "        \"\$OUT_DIR\$OUT_MP3\" \\"
   echo "        2>\"/dev/null\"      \\"
+  echo "  | utf82ascii\""
   echo "  | sed -re \"s/.+/# &/\""
   echo
   echo "} > \"\$OUT_DIR\$OUT_CFG\""
@@ -1195,7 +1316,7 @@ if [ ! -f "$DBFILE" ] ; then
 fi
 
 # get feed title once and convert text to ASCII
-readonly FEED_TITLE=$(get_feed_title "$FEED_FILE" | ./fn.utf82ascii)
+readonly FEED_TITLE=$(get_feed_title "$FEED_FILE" | utf82ascii)
 
 # check title
 if [ -z "$FEED_TITLE" ] ; then
@@ -1213,11 +1334,11 @@ while true
 do
 
   # read data from first item and convert text to ASCII
-        MEDIA=$(get_episode_media       "$FEED_FILE"                  )
-        TITLE=$(get_episode_title       "$FEED_FILE" | ./fn.utf82ascii)
-       AUTHOR=$(get_episode_author      "$FEED_FILE" | ./fn.utf82ascii)
-         DATE=$(get_episode_date        "$FEED_FILE"                  )
-  DESCRIPTION=$(get_episode_description "$FEED_FILE" | ./fn.utf82ascii)
+        MEDIA=$(get_episode_media       "$FEED_FILE"             )
+        TITLE=$(get_episode_title       "$FEED_FILE" | utf82ascii)
+       AUTHOR=$(get_episode_author      "$FEED_FILE" | utf82ascii)
+         DATE=$(get_episode_date        "$FEED_FILE"             )
+  DESCRIPTION=$(get_episode_description "$FEED_FILE" | utf82ascii)
 
   # no more data
   [ -z "$MEDIA" ] && break
