@@ -1,11 +1,13 @@
 audio/
+numbers/*.mp3
+numbers/*.wav
+playlists/keyfile
+playlists/*.m3u
 pull/
 raw/
 skipped/
-playlists/*.m3u
-playlists/keyfile
 
-pulldb
 commit
+pulldb
 skip
 
