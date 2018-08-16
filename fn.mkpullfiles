@@ -3,7 +3,6 @@
 # ------------------------------------------------------------------------------
 # settings                                                              settings
 # ------------------------------------------------------------------------------
-set -o errexit   # exit immediately if a command exits with a non-zero status
 set -o errtrace  # any trap on ERR is inherited by shell functions,
                  #   command substitutions, and commands executed in a subshell
                  #   environment
@@ -1343,6 +1342,9 @@ do
   # no more data
   [ -z "$MEDIA" ] && break
 
+  # get hash value of this url
+  MEDIAHASH=$(sha1sum <<< "$MEDIA" | sed -re "s/ .+//")
+
   # title is needed
   if [ -z "$TITLE" ] ; then
 
@@ -1384,7 +1386,7 @@ do
   [ -z "$DESCRIPTION" ] && warnmsg "no DESCRIPTION found in $MEDIA"
 
   # set filenames
-  PULLCORE=$(simplify <<< "$FEED_TITLE $UTC_DATE $TITLE" | sed -re "s/^(.{224}).+/\1/")
+  PULLCORE=$(simplify <<< "$UTC_DATE $FEED_TITLE $MEDIAHASH")
   PULLFILE="$PULLCORE.pull"
 
   # check if pull file has already been created
@@ -1435,8 +1437,8 @@ do
 
 done
 
-# newest episodes first
-sort -ro "$DBFILE" "$DBFILE"
+# keep database sorted
+sort -uo "$DBFILE" "$DBFILE"
 
 # signalize success
 exit 0
