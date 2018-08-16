@@ -2,7 +2,6 @@ audio/
 pull/
 raw/
 skipped/
-tcheck/
 playlists/*.m3u
 playlists/keyfile
 

@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# output filename
+readonly DONEFILE="done"
+readonly NEXTFILE="nextfile"
+
+# check if a next file is already (sill) present
+if [ -s "$NEXTFILE" ] ; then
+
+  # push filename to stdout
+  head -n 1 "$NEXTFILE"
+
+  # stop here
+  exit 0
+
+fi
+
+# create temporary file
+TEMPFILE=$(mktemp --suffix=".next")
+
+# remove temporary file on exit
+trap 'rm -rf "$TEMPFILE"' EXIT
+
+# reset file
+truncate --size=0 "$NEXTFILE"
+
+# assert done file is present
+touch "$DONEFILE"
+
+# assert done file is sorted
+sort -o "$DONEFILE" "$DONEFILE"
+
+# find all mp3 files in ZeitZeichen
+find "$HOME/podcast/audio/ZeitZeichen/" \
+     -type "f"                          \
+     -regextype "posix-extended"        \
+     -regex ".+\.[Mm][Pp]3$"            \
+| sort                                  \
+> "$TEMPFILE"
+
+# get first line unique to temp
+comm -23 "$TEMPFILE" "$DONEFILE" | head -n 1 > "$NEXTFILE"
+
+# push filename to stdout
+head -n 1 "$NEXTFILE"
+
+# signalize success
+exit 0
+

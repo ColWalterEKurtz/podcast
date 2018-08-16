@@ -1,0 +1,300 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errexit   # exit immediately if a command exits with a non-zero status
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# -------
+# squeeze
+# -------
+#
+# ... | squeeze | ...
+#
+function squeeze()
+{
+  sed --regexp-extended \
+      --expression="
+
+        # reduce each gap to one single space
+        s/[[:space:]]+/ /g
+
+        # trim both ends
+        s/^ //
+        s/ $//
+      "
+}
+
+# ----------------
+# extract_ID3_tags
+# ----------------
+#
+# $1  filename
+#
+function extract_ID3_tags()
+{
+  # extract all frames
+  id3v2 -R "$1"               \
+  | sed --regexp-extended     \
+        -e "/^$/d"            \
+        -e "/^Filename:/d"    \
+        -e "/No ID3v1 tag$/d" \
+        -e "/No ID3 tag$/d"   \
+        -e "s/\"/\'/g"        \
+  | ./utf82ascii              \
+  | squeeze
+}
+
+# ---------------
+# get_tracknumber
+# ---------------
+#
+# $1  filename
+#
+function get_tracknumber()
+{
+  extract_ID3_tags "$1"   \
+  | sed --quiet           \
+        --regexp-extended \
+        --expression="
+
+          # grep TRCK tag and skip leading zeros
+          s/^TRCK:[[:space:]]+0*([[:digit:]]+)/\1/p
+        "
+}
+
+# ---------
+# get_title
+# ---------
+#
+# $1  filename
+#
+function get_title()
+{
+  extract_ID3_tags "$1"   \
+  | sed --quiet           \
+        --regexp-extended \
+        --expression="
+
+          # grep TIT2 tag
+          s/^TIT2:[[:space:]]+(.+)/\1/p
+        "
+}
+
+# -----------------
+# create_check_file
+# -----------------
+#
+# $1  filename (output)
+#
+function create_check_file()
+{
+  # get next filename
+  local MP3FILE=$(./next)
+
+  # check filename
+  if [ -z "$MP3FILE" ] ; then
+
+    # notify user
+    failmsg "unable to get next filename"
+
+    # signalize trouble
+    return 1
+
+  fi
+
+  # check file
+  if [ ! -f "$MP3FILE" ] ; then
+
+    # notify user
+    failmsg "unable to locate file: \"$MP3FILE\""
+
+    # signalize trouble
+    return 1
+
+  fi
+
+  # get ID3 tags
+  local TRKNO=$(get_tracknumber "$MP3FILE")
+  local TITLE=$(get_title "$MP3FILE")
+
+  # check filename
+  if [ -z "$TRKNO" ] ; then
+
+    # notify user
+    failmsg "unable to get tracknumber: \"$MP3FILE\""
+
+    # signalize trouble
+    return 1
+
+  fi
+
+  # check filename
+  if [ -z "$TITLE" ] ; then
+
+    # notify user
+    failmsg "unable to get title: \"$MP3FILE\""
+
+    # signalize trouble
+    return 1
+
+  fi
+
+  # redirect entire group
+  {
+    echo "FIL=$MP3FILE"
+    echo "TRK=$TRKNO"
+    echo "OLD=$TITLE"
+    echo "NEW=$TITLE"
+
+  } > "$1"
+
+  # signalize success
+  return 0
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# output filename
+readonly CHECKFILE="checkfile"
+
+# check if file is missing or empty
+if [ ! -s "$CHECKFILE" ] ; then
+
+  # try to create new check file
+  if ! create_check_file "$CHECKFILE" ; then
+
+    # unable to create check file
+    exit 1
+
+  fi
+
+fi
+
+# get next filename
+MP3FILE=$(sed -nre "s/^FIL=(.+)/\1/p" "$CHECKFILE")
+
+# check filename
+if [ -z "$MP3FILE" ] ; then
+
+  # notify user
+  failmsg "unable to get next filename"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# check file
+if [ ! -f "$MP3FILE" ] ; then
+
+  # notify user
+  failmsg "unable to locate file: \"$MP3FILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# play mp3 file in background
+mplayer -nolirc -vc "null" -vo "null" -loop "0" "$MP3FILE" &>"/dev/null" &
+
+# get mplayer's process ID
+PID="$!"
+
+# open editor
+vim "+4" "$CHECKFILE"
+
+# check if mplayer is still running
+PROC=$(ps -A | grep -E "^[[:space:]]*$PID[[:space:]].+mplayer$")
+
+# check process
+if [ -n "$PROC" ]; then
+
+  # kill mplayer
+  kill -s "SIGTERM" "$PID"
+
+fi
+
+# signalize success
+exit 0
+
