@@ -1,40 +1,111 @@
 #!/bin/bash
 
 # ------------------------------------------------------------------------------
-# parameters                                                          parameters
+# settings                                                              settings
 # ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
 
-PLAYLIST="$1"
-STARTNUM="$2"
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
 
 # ------------------------------------------------------------------------------
 # functions                                                            functions
 # ------------------------------------------------------------------------------
 
-# ------
-# errmsg
-# ------
+# ---------
+# show_help
+# ---------
 #
-# This function prints a red error message via stderr.
 #
-function errmsg()
+#
+function show_help()
 {
-  # push to stderr
-  echo -e "\e[1;91m[ERROR]\e[0m $1" 1>&2
+  # TODO: more readable version needed...
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # crop this part of the script
+        /^# HELP>>/,/^# <<HELP/ {
+
+          # skip these lines
+          /^# HELP>>/d
+          /^# <<HELP/d
+
+          # print line
+          p
+        }
+
+      " "$0"
 }
 
-# ----
-# catz
-# ----
+# -------
+# failmsg
+# -------
 #
-# ... | catz | ...
+# This function prints a red colored message via stderr.
 #
-function catz()
+function failmsg()
 {
-  # replace all '[CR]?[NL]' sequences with [NUL]
-  # skip empty lines
-  sed -ze 's/\o15\?\o12/\o0/g' |
-  sed -ze '/^[[:space:]]*$/d'
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
 }
 
 # -----------
@@ -45,47 +116,97 @@ function catz()
 #
 function get_integer()
 {
-  sed -nre 's/^(-?[[:digit:]]+)$/\1+0/p' <<< "$1" | bc 2>'/dev/null'
+  # let bc add zero
+  sed -nre "s/^(-?)0*([[:digit:]]+)$/\1\2 + 0/p" <<< "$1" | bc 2>"/dev/null"
 }
 
+# HELP>>
+# ------------------------------------------------------------------------------
+# options                                                                options
+# ------------------------------------------------------------------------------
+
+# set default values
+OPMODE="DEFAULT"
+USEWAV="0"
+STARTNUM="1"
+
+# set options to accept
+readonly KNOWN_OPTIONS=":hn:w"
+
+# check passed options
+while getopts "$KNOWN_OPTIONS" OPTION "$@"
+do
+
+  case "$OPTION" in
+
+    # show help
+    "h") OPMODE="SHOW_HELP"
+         ;;
+
+    # set initial number
+    "n") STARTNUM="$OPTARG"
+         ;;
+
+    # use wav files
+    "w") USEWAV="1"
+         ;;
+    
+    "?") failmsg "unknown option: -$OPTARG"
+         exit 1
+         ;;
+
+    ":") failmsg "missing argument: -$OPTARG <argument>"
+         exit 1
+         ;;
+
+  esac
+
+done
+
+# get number of positional parameters
+PPNUM=$(( $# - OPTIND + 1 ))
+
+# drop all parsed options
+shift $(( OPTIND - 1 ))
+
+# <<HELP
 # ------------------------------------------------------------------------------
 # commands                                                              commands
 # ------------------------------------------------------------------------------
 
-# set default value
-USEWAV='0'
+# show help and exit
+if [ "$OPMODE" == "SHOW_HELP" ] ; then
 
-# check option
-if [ "$PLAYLIST" == '-w' ]; then
+  # push help to stderr
+  show_help 1>&2
 
-  # update flag
-  USEWAV='1'
-
-  # drop first srgument
-  shift
-
-  # update arguments
-  PLAYLIST="$1"
-  STARTNUM="$2"
+  # break pipe
+  exit 1
 
 fi
 
-# check file
-if [ ! -f "$PLAYLIST" ]; then
+# check number of positional parameters
+if (( PPNUM != 1 )) ; then
 
   # notify user
-  errmsg "unable to open file: \"$PLAYLIST\""
+  failmsg "exactly one filename needed (m3u file)"
 
   # signalize trouble
   exit 1
 
 fi
 
-# check start number
-if [ -z "$STARTNUM" ]; then
+# use first positional parameter as filename of the playlist
+PLAYLIST="$1"
 
-  # set default value
-  STARTNUM='1'
+# check file
+if [ ! -f "$PLAYLIST" ]; then
+
+  # notify user
+  failmsg "unable to open file: \"$PLAYLIST\""
+
+  # signalize trouble
+  exit 1
 
 fi
 
@@ -96,7 +217,7 @@ TRACKNUMBER=$(get_integer "$STARTNUM")
 if [ -z "$TRACKNUMBER" ]; then
 
   # notify user
-  errmsg "invalid track number: \"$TRACKNUMBER\""
+  failmsg "invalid track number: \"$TRACKNUMBER\""
 
   # signalize trouble
   exit 1
@@ -104,17 +225,17 @@ if [ -z "$TRACKNUMBER" ]; then
 fi
 
 # to buffer the comment that has been extractet most recently
-EXTINFBUFFER=''
+EXTINFBUFFER=""
 
 # read lines
 while read -rd $'\0' FILENAME
 do
 
   # check if the header line is read
-  if [ "$FILENAME" == '#EXTM3U' ]; then
+  if [ "$FILENAME" == "#EXTM3U" ]; then
 
     # show header
-    echo '#EXTM3U'
+    echo "#EXTM3U"
 
     # but don't increase counter
     continue
@@ -133,7 +254,7 @@ do
   fi
 
   # check if a comment is read
-  if [ "${FILENAME:0:7}" == '#EXTINF' ]; then
+  if [ "${FILENAME:0:7}" == "#EXTINF" ]; then
 
     # buffer comment
     EXTINFBUFFER="$FILENAME"
@@ -144,15 +265,15 @@ do
   fi
 
   # check flag
-  if (( USEWAV == 1 )); then
+  if [ "$USEWAV" == "1" ] ; then
 
     # get spoken number (wav version)
-    SPEECHFILE=$(getnumber -w "$TRACKNUMBER")
+    SPEECHFILE=$(../numbers/getnumber -w "$TRACKNUMBER")
   
   else
 
     # get spoken number (mp3 version)
-    SPEECHFILE=$(getnumber "$TRACKNUMBER")
+    SPEECHFILE=$(../numbers/getnumber "$TRACKNUMBER")
 
   fi
 
@@ -172,12 +293,13 @@ do
   echo "$FILENAME"
 
   # reset buffer
-  EXTINFBUFFER=''
+  EXTINFBUFFER=""
 
   # increase counter
   (( TRACKNUMBER += 1 ))
 
-done < <(catz < "$PLAYLIST")
+done < <(tr '\n' '\0' < "$PLAYLIST")
 
+# signalize success
 exit 0
 
