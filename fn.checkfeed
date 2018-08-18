@@ -3,7 +3,6 @@
 # ------------------------------------------------------------------------------
 # settings                                                              settings
 # ------------------------------------------------------------------------------
-set -o errexit   # exit immediately if a command exits with a non-zero status
 set -o errtrace  # any trap on ERR is inherited by shell functions,
                  #   command substitutions, and commands executed in a subshell
                  #   environment
@@ -29,6 +28,7 @@ readonly    BLUE=$(tput setaf 4)
 readonly MAGENTA=$(tput setaf 5)
 readonly    CYAN=$(tput setaf 6)
 readonly   WHITE=$(tput setaf 7)
+readonly  WHITER=$(tput setaf 7 ; tput rev)
 
 # ------------------------------------------------------------------------------
 # functions                                                            functions
@@ -68,6 +68,18 @@ function infomsg()
 {
   # push to stderr
   echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# INFOMSG
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function INFOMSG()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} ${WHITER}$1${NONE}" 1>&2
 }
 
 # -------
@@ -203,6 +215,9 @@ function get_items()
           # author
           s/^<[Ii][Tt][Uu][Nn][Ee][Ss]:[Aa][Uu][Tt][Hh][Oo][Rr]>(.+)/AUTHOR=\1/p
 
+          # duration
+          s/^<[Ii][Tt][Uu][Nn][Ee][Ss]:[Dd][Uu][Rr][Aa][Tt][Ii][Oo][Nn]>(.+)/DURATION=\1/p
+
           # description
           /^<[Dd][Ee][Ss][Cc][Rr][Ii][Pp][Tt][Ii][Oo][Nn]>/,/^<\/[Dd][Ee][Ss][Cc][Rr][Ii][Pp][Tt][Ii][Oo][Nn]>/ {
 
@@ -275,7 +290,7 @@ TEMPFILE=$(mktemp)
 trap 'rm -rf "$TEMPFILE"' EXIT
 
 # notify user
-infomsg "updating rss feed: $URL"
+INFOMSG "updating rss feed: $URL"
 
 # download xml file once
 get_html "$URL" > "$TEMPFILE"
@@ -284,7 +299,7 @@ get_html "$URL" > "$TEMPFILE"
 if [ ! -s "$TEMPFILE" ] ; then
 
   # notify user
-  failmsg "unable to  read data from \"$URL\""
+  failmsg "unable to read data from \"$URL\""
 
   # signalize trouble
   exit 1
