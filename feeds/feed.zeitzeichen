@@ -1,0 +1,547 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# cli                                                                        cli
+# ------------------------------------------------------------------------------
+
+# -a  artist to use in the local mp3 file
+# -d  topmost target directory
+# -i  path of the background image
+# -M  max duration to download automatically
+# -m  min diration to download automatically
+# -q  quality factor of the jpeg compression
+# -t  title to use in the local mp3 file; option arguments are:
+#       <title> <author> <date> 
+# -u  podcast url
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# get month names in german
+export LC_TIME="de_DE.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# for internal use
+readonly PODCASTDIR="$HOME/podcast"
+readonly EVENTFORMAT="%s-%04d-%02d-%02d\\n"
+
+# invariable values
+readonly         URL="https://www1.wdr.de/mediathek/audio/zeitzeichen/zeitzeichen-podcast-100.podcast"
+readonly MINDURATION="00:12:00"
+readonly MAXDURATION="00:16:00"
+readonly      TOPDIR="$PODCASTDIR/audio/ZeitZeichen/"
+readonly  BACKGROUND="$PODCASTDIR/images/zeitzeichen.png"
+readonly     QUALITY="95"
+readonly      ARTIST="WDR 5 - ZeitZeichen"
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ---------------
+# get_event_epoch
+# ---------------
+#
+# $1  title
+#
+function get_event_epoch()
+{
+  # v. Chr.
+  local readonly VCR="([^[:alpha:]])([Vv]\.[[:space:]]*[Cc][Hh][Rr]\.)([^[:alpha:]])"
+
+  # try to find regular expression
+  local EPOCH=$(sed -nre "s/.*$VCR.*/\2/p" <<< "$1")
+
+  # expression found
+  if [ -n "$EPOCH" ] ; then
+
+    # push epoch to stdout
+    printf "%s" "AC"
+
+    # exit function
+    return 0
+
+  fi
+
+  # push default value to stdout
+  printf "%s" "PC"
+
+  # signalize success
+  return 0
+}
+
+# ------------------
+# get_event_date_v01
+# ------------------
+#
+# $1  title
+#
+# Alfred Doeblin, Schriftsteller (Geburtstag 10.08.1878)
+#
+function get_event_date_v01()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+
+  # set regular expression to use
+  local readonly REG=".+\(.+[[:space:]]0*($NUM)${SEP}0*($NUM)${SEP}0*($NUM)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_event_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\3/p" <<< "$1")
+  local EPM=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPD=$(sed -nre "s/$REG/\1/p" <<< "$1")
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$EVENTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------------
+# get_event_date_v02
+# ------------------
+#
+# $1  title
+#
+# Indisches "Gesetz gegen sexuelle Belaestigung" (23.04.2013)
+#
+function get_event_date_v02()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+
+  # set regular expression to use
+  local readonly REG=".+\(0*($NUM)${SEP}0*($NUM)${SEP}0*($NUM)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_event_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\3/p" <<< "$1")
+  local EPM=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPD=$(sed -nre "s/$REG/\1/p" <<< "$1")
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$EVENTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------------
+# get_event_date_v03
+# ------------------
+#
+# $1  title
+#
+# Die "Union von Kalmar" wird geschlossen (im Juli 1397)
+#
+function get_event_date_v03()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+
+  # set regular expression to use
+  local readonly REG=".+[^[:alpha:]]im +([^ ]+) +([[:digit:]]+)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_event_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPX=$(sed -nre "s/$REG/\1/p" <<< "$1")
+  local EPD=0
+
+  # set month
+  case "$EPX" in
+    "Januar")    EPM="1"  ;;
+    "Februar")   EPM="2"  ;;
+    "Maerz")     EPM="3"  ;;
+    "April")     EPM="4"  ;;
+    "Mai")       EPM="5"  ;;
+    "Juni")      EPM="6"  ;;
+    "Juli")      EPM="7"  ;;
+    "August")    EPM="8"  ;;
+    "September") EPM="9"  ;;
+    "Oktober")   EPM="10" ;;
+    "November")  EPM="11" ;;
+    "Dezember")  EPM="12" ;;
+    *)           EPM="0"  ;;
+  esac
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$EVENTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------------
+# get_event_date_v04
+# ------------------
+#
+# $1  title
+#
+# Romulus gruendet Rom (am 21.04.753 v. Chr.)
+#
+function get_event_date_v04()
+{
+  # sed abbreviations
+  local readonly SEP="[[:space:]]*\.[[:space:]]*"
+  local readonly NUM="[[:digit:]]+"
+  local readonly VCR="[^[:alpha:]][Vv]\.[[:space:]]*[Cc][Hh][Rr]\.[[:space:]]*"
+
+  # set regular expression to use
+  local readonly REG=".+\(.+[[:space:]]0*($NUM)${SEP}0*($NUM)${SEP}0*($NUM)$VCR\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_event_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\3/p" <<< "$1")
+  local EPM=$(sed -nre "s/$REG/\2/p" <<< "$1")
+  local EPD=$(sed -nre "s/$REG/\1/p" <<< "$1")
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$EVENTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# ------------------
+# get_event_date_v05
+# ------------------
+#
+# $1  title
+#
+# Avicenna, Arzt und Philosoph (Todesjahr 1037)
+#
+function get_event_date_v05()
+{
+  # set regular expression to use
+  local readonly REG=".+\([^\.]+[[:space:]]+([[:digit:]]+)\)[[:space:]]*$"
+
+  # grep data
+  local EPE=$(get_event_epoch "$1")
+  local EPY=$(sed -nre "s/$REG/\1/p" <<< "$1")
+  local EPM="0"
+  local EPD="0"
+
+  # check values
+  [ -z "$EPE" ] && return 1
+  [ -z "$EPY" ] && return 1
+  [ -z "$EPM" ] && return 1
+  [ -z "$EPD" ] && return 1
+
+  # push to stdout
+  printf "$EVENTFORMAT" "$EPE" "$EPY" "$EPM" "$EPD"
+
+  # signalize success
+  return 0
+}
+
+# --------------
+# get_event_date
+# --------------
+#
+# $1  title
+#
+function get_event_date()
+{
+  # strat with empty date
+  local EVENTDATE=""
+
+  # try different schemes
+  [ -z "$EVENTDATE" ] && EVENTDATE=$(get_event_date_v01 "$1")
+  [ -z "$EVENTDATE" ] && EVENTDATE=$(get_event_date_v02 "$1")
+  [ -z "$EVENTDATE" ] && EVENTDATE=$(get_event_date_v03 "$1")
+  [ -z "$EVENTDATE" ] && EVENTDATE=$(get_event_date_v04 "$1")
+  [ -z "$EVENTDATE" ] && EVENTDATE=$(get_event_date_v05 "$1")
+
+  # check result
+  if [ -n "$EVENTDATE" ] ; then
+
+    # push to stdout
+    echo "$EVENTDATE"
+
+  else
+
+    # notify user
+    warnmsg "unable to detect event date: \"$1\""
+
+    # push zero date to stdout
+    printf "$EVENTFORMAT" "PC" "0" "0" "0"
+
+  fi
+
+  # signalize success
+  return 0
+}
+
+# -----------------
+# get_episode_title
+# -----------------
+#
+# $1  title
+# $2  airtime
+#
+function get_episode_title()
+{
+  # get event date
+  local EVENTDATE=$(get_event_date "$1")
+
+  # try to set own airtime format
+  local MYDATE=$(date -d "$2" "+%-d. %B %Y" 2>"/dev/null")
+
+  # unable to convert airtime
+  if [ -z "$MYDATE" ] ; then
+
+    # notify user
+    warnmsg "invalid airtime: \"$2\""
+
+    # use current date (UTC)
+    local MYDATE=$(date -u "+%-d. %B %Y")
+
+  fi
+
+  # apply some common modifications
+  local MYTITLE=$(sed --regexp-extended \
+                      --expression="
+
+                        # move Geburtstag to the front
+                        s/^(.+)\(Geburtstag .+\)$/Der Geburtstag \1/
+
+                        # move Geburtsjahr to the front
+                        s/^(.+)\(Geburtsjahr[[:space:]]+([[:digit:]]+)\)$/Im Jahr \2 wird \1 geboren/
+
+                        # move Todestag to the front
+                        s/^(.+)\(Todestag .+\)$/Der Todestag \1/
+
+                        # move Todesjahr to the front
+                        s/^(.+)\(Todesjahr[[:space:]]+([[:digit:]]+)\)$/Im Jahr \2 stirbt \1/
+
+                        # remove trailing parenthesis
+                        s/[[:space:]]*\([^\)]+\)$//
+
+                        # replace double quotes
+                        s/\"/'/g
+
+                        # expand some abbreviations
+                        s/amerik\./amerikanisch/g
+                        s/brit\./britisch/g
+                        s/chilen\./chilenisch/g
+                        s/dt\./deutsch/g
+                        s/engl\./englisch/g
+                        s/frz\./franzoesisch/g
+                        s/ital\./italienisch/g
+                        s/oesterr\./oesterreichisch/g
+                        s/port\./portugisisch/g
+                        s/sowj\./sowjetisch/g
+                        s/span\./spanisch/g
+                        s/suedafrikan\./suedafrikanisch/g
+                        s/tuerk\./tuerkisch/g
+
+                        # trim line
+                        s/[[:space:]]+/ /g
+                        s/^ //
+                        s/ $//
+
+                      " <<< "$1")
+
+  # push new title to stdout
+  echo "$EVENTDATE: $MYTITLE (Sendung: $MYDATE)"
+
+  # signalize success
+  return 0
+}
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# URL
+if [ "$1" == "-u" ] ; then
+
+  # push URL to stdout
+  echo "$URL"
+
+  # signalize success
+  exit 0
+
+fi
+
+# min duration
+if [ "$1" == "-m" ] ; then
+
+  # push min HH:MM:SS to stdout
+  echo "$MINDURATION"
+
+  # signalize success
+  exit 0
+
+fi
+
+# min duration
+if [ "$1" == "-M" ] ; then
+
+  # push max HH:MM:SS to stdout
+  echo "$MAXDURATION"
+
+  # signalize success
+  exit 0
+
+fi
+
+# topmost target directory
+if [ "$1" == "-d" ] ; then
+
+  # push path to stdout
+  echo "$TOPDIR"
+
+  # signalize success
+  exit 0
+
+fi
+
+# path of the background image
+if [ "$1" == "-i" ] ; then
+
+  # push path to stdout
+  echo "$BACKGROUND"
+
+  # signalize success
+  exit 0
+
+fi
+
+# quality factor of the jpeg compression
+if [ "$1" == "-q" ] ; then
+
+  # push factor to stdout
+  echo "$QUALITY"
+
+  # signalize success
+  exit 0
+
+fi
+
+# artist
+if [ "$1" == "-a" ] ; then
+
+  # push artist to stdout
+  echo "$ARTIST"
+
+  # signalize success
+  exit 0
+
+fi
+
+# title
+if [ "$1" == "-t" ] ; then
+
+  # get option arguments
+   EPTITLE="$2"
+  EPAUTHOR="$3"
+    EPDATE="$4"
+
+  # set missing values
+  [ -z "$EPTITLE"  ] && EPTITLE="TITLE"
+  [ -z "$EPAUTHOR" ] && EPAUTHOR="LASTNAME, FIRSTNAME"
+  [ -z "$EPDATE"   ] && EPDATE=$(date -u "+%Y-%m-%d %H:%M:%S %Z")
+
+  # push title to stdout
+  get_episode_title "$EPTITLE" "$EPDATE"
+
+  # signalize success
+  exit 0
+
+fi
+
+# signalize trouble
+exit 1
+
