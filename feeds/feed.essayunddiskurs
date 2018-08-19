@@ -25,7 +25,7 @@ export LC_TIME="de_DE.UTF-8"
 readonly PODCASTDIR="$HOME/podcast"
 
 # invariable values
-readonly         URL="https://www.deutschlandfunk.de/essay-und-diskurs.1183.de.rss"
+readonly         URL="https://www.deutschlandfunk.de/podcast-essay-und-diskurs.1185.de.podcast.xml"
 readonly MINDURATION="00:25:00"
 readonly MAXDURATION="00:35:00"
 readonly      TOPDIR="$PODCASTDIR/audio/Essay/"

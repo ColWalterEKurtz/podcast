@@ -10,7 +10,7 @@ if [ -d "$PULLDIR" ] ; then
   cd "$PULLDIR"
 
   # run each pull file
-  ls -b *.pull 2>"/dev/null" | sort | xargs -L1 bash
+  ls -b *.pull 2>"/dev/null" | sort | xargs -L1 -I'{}' bash "{}" "$@"
 
 fi
 

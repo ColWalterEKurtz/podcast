@@ -458,91 +458,6 @@ function drop_first_item()
 }
 
 # --------------------
-# get_background_image
-# --------------------
-#
-# $1  feed title
-#
-function get_background_image()
-{
-  # root directory for all background images
-  local readonly IMAGEDIR="../images/"
-
-  # set paths of known images
-  local readonly        BRENNPUNKT="${IMAGEDIR}brennpunkt.png"
-  local readonly            COMKOM="${IMAGEDIR}comkom.png"
-  local readonly           DOSSIER="${IMAGEDIR}dossier.png"
-  local readonly         FORSCHUNG="${IMAGEDIR}forschung.png"
-  local readonly       HINTERGRUND="${IMAGEDIR}hintergrund.png"
-  local readonly      KULTURFRAGEN="${IMAGEDIR}kulturfragen.png"
-  local readonly KULTURPRESSESCHAU="${IMAGEDIR}kulturpresseschau.png"
-  local readonly            KUSOWI="${IMAGEDIR}kusowi.png"
-  local readonly         STERNZEIT="${IMAGEDIR}sternzeit.png"
-  local readonly       ZEITZEICHEN="${IMAGEDIR}zeitzeichen.png"
-
-  # check feed title
-  case "$1" in
-
-    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
-      echo "$KUSOWI"
-      return 0
-      ;;
-
-    "Computer und Kommunikation Beitraege - Deutschlandfunk")
-      echo "$COMKOM"
-      return 0
-      ;;
-
-    "Dossier - Deutschlandfunk")
-      echo "$DOSSIER"
-      return 0
-      ;;
-
-    "Forschung Aktuell - Deutschlandfunk")
-      echo "$FORSCHUNG"
-      return 0
-      ;;
-
-    "Hintergrund - Deutschlandfunk")
-      echo "$HINTERGRUND"
-      return 0
-      ;;
-
-    "Kulturfragen - Deutschlandfunk")
-      echo "$KULTURFRAGEN"
-      return 0
-      ;;
-
-    "Kulturpresseschau - Deutschlandfunk Kultur")
-      echo "$KULTURPRESSESCHAU"
-      return 0
-      ;;
-
-    "Sternzeit - Deutschlandfunk")
-      echo "$STERNZEIT"
-      return 0
-      ;;
-
-    "WDR ZeitZeichen")
-      echo "$ZEITZEICHEN"
-      return 0
-      ;;
-
-    "Wissenschaft im Brennpunkt - Deutschlandfunk")
-      echo "$BRENNPUNKT"
-      return 0
-      ;;
-
-  esac
-
-  # notify user
-  failmsg "unknown feed: \"$1\""
-
-  # signalize trouble
-  return 1
-}
-
-# --------------------
 # get_foreground_image
 # --------------------
 #
@@ -565,255 +480,6 @@ function get_foreground_image()
 
   # signalize success
   return 0
-}
-
-# ---------------------
-# get_image_compression
-# ---------------------
-#
-# $1  feed title
-#
-function get_image_compression()
-{
-  # set known quality factors (target file size: <80KB)
-  local readonly        BRENNPUNKT="93"
-  local readonly            COMKOM="97"
-  local readonly           DOSSIER="100"
-  local readonly         FORSCHUNG="94"
-  local readonly       HINTERGRUND="92"
-  local readonly      KULTURFRAGEN="96"
-  local readonly KULTURPRESSESCHAU="99"
-  local readonly            KUSOWI="97"
-  local readonly         STERNZEIT="97"
-  local readonly       ZEITZEICHEN="95"
-
-  # check feed title
-  case "$1" in
-
-    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
-      echo "$KUSOWI"
-      return 0
-      ;;
-
-    "Computer und Kommunikation Beitraege - Deutschlandfunk")
-      echo "$COMKOM"
-      return 0
-      ;;
-
-    "Dossier - Deutschlandfunk")
-      echo "$DOSSIER"
-      return 0
-      ;;
-
-    "Forschung Aktuell - Deutschlandfunk")
-      echo "$FORSCHUNG"
-      return 0
-      ;;
-
-    "Hintergrund - Deutschlandfunk")
-      echo "$HINTERGRUND"
-      return 0
-      ;;
-
-    "Kulturfragen - Deutschlandfunk")
-      echo "$KULTURFRAGEN"
-      return 0
-      ;;
-
-    "Kulturpresseschau - Deutschlandfunk Kultur")
-      echo "$KULTURPRESSESCHAU"
-      return 0
-      ;;
-
-    "Sternzeit - Deutschlandfunk")
-      echo "$STERNZEIT"
-      return 0
-      ;;
-
-    "WDR ZeitZeichen")
-      echo "$ZEITZEICHEN"
-      return 0
-      ;;
-
-    "Wissenschaft im Brennpunkt - Deutschlandfunk")
-      echo "$BRENNPUNKT"
-      return 0
-      ;;
-
-  esac
-
-  # notify user
-  failmsg "unknown feed: \"$1\""
-
-  # signalize trouble
-  return 1
-}
-
-# ----------
-# get_topdir
-# ----------
-#
-# $1  feed title
-#
-function get_topdir()
-{
-  # root directory for all audio files
-  local readonly ROOTDIR="../audio/"
-
-  # set directories of known feeds
-  local readonly        BRENNPUNKT="${ROOTDIR}Brennpunkt/"
-  local readonly            COMKOM="${ROOTDIR}ComKom/"
-  local readonly           DOSSIER="${ROOTDIR}Dossier/"
-  local readonly         FORSCHUNG="${ROOTDIR}Forschung/"
-  local readonly       HINTERGRUND="${ROOTDIR}Hintergrund/"
-  local readonly      KULTURFRAGEN="${ROOTDIR}Kulturfragen/"
-  local readonly KULTURPRESSESCHAU="${ROOTDIR}Kulturpresseschau/"
-  local readonly            KUSOWI="${ROOTDIR}KuSoWi/"
-  local readonly         STERNZEIT="${ROOTDIR}Sternzeit/"
-  local readonly       ZEITZEICHEN="${ROOTDIR}ZeitZeichen/"
-
-  # check feed title
-  case "$1" in
-
-    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
-      echo "$KUSOWI"
-      return 0
-      ;;
-
-    "Computer und Kommunikation Beitraege - Deutschlandfunk")
-      echo "$COMKOM"
-      return 0
-      ;;
-
-    "Dossier - Deutschlandfunk")
-      echo "$DOSSIER"
-      return 0
-      ;;
-
-    "Forschung Aktuell - Deutschlandfunk")
-      echo "$FORSCHUNG"
-      return 0
-      ;;
-
-    "Hintergrund - Deutschlandfunk")
-      echo "$HINTERGRUND"
-      return 0
-      ;;
-
-    "Kulturfragen - Deutschlandfunk")
-      echo "$KULTURFRAGEN"
-      return 0
-      ;;
-
-    "Kulturpresseschau - Deutschlandfunk Kultur")
-      echo "$KULTURPRESSESCHAU"
-      return 0
-      ;;
-
-    "Sternzeit - Deutschlandfunk")
-      echo "$STERNZEIT"
-      return 0
-      ;;
-
-    "WDR ZeitZeichen")
-      echo "$ZEITZEICHEN"
-      return 0
-      ;;
-
-    "Wissenschaft im Brennpunkt - Deutschlandfunk")
-      echo "$BRENNPUNKT"
-      return 0
-      ;;
-
-  esac
-
-  # notify user
-  failmsg "unknown feed: \"$1\""
-
-  # signalize trouble
-  return 1
-}
-
-# ----------
-# get_artist
-# ----------
-#
-# $1  feed title
-#
-function get_artist()
-{
-  # set artists of known feeds
-  local readonly        BRENNPUNKT="DLF - Wissenschaft im Brennpunkt"
-  local readonly            COMKOM="DLF - Computer und Kommunikation"
-  local readonly           DOSSIER="DLF - Dossier"
-  local readonly         FORSCHUNG="DLF - Forschung Aktuell"
-  local readonly       HINTERGRUND="DLF - Hintergrund"
-  local readonly      KULTURFRAGEN="DLF - Kulturfragen"
-  local readonly KULTURPRESSESCHAU="DRK - Kulturpresseschau"
-  local readonly            KUSOWI="DLF - Aus Kultur- und Sozialwissenschaften"
-  local readonly         STERNZEIT="DLF - Sternzeit"
-  local readonly       ZEITZEICHEN="WDR 5 - ZeitZeichen"
-
-  # check feed title
-  case "$1" in
-
-    "Aus Kultur- und Sozialwissenschaften - Deutschlandfunk")
-      echo "$KUSOWI"
-      return 0
-      ;;
-
-    "Computer und Kommunikation Beitraege - Deutschlandfunk")
-      echo "$COMKOM"
-      return 0
-      ;;
-
-    "Dossier - Deutschlandfunk")
-      echo "$DOSSIER"
-      return 0
-      ;;
-
-    "Forschung Aktuell - Deutschlandfunk")
-      echo "$FORSCHUNG"
-      return 0
-      ;;
-
-    "Hintergrund - Deutschlandfunk")
-      echo "$HINTERGRUND"
-      return 0
-      ;;
-
-    "Kulturfragen - Deutschlandfunk")
-      echo "$KULTURFRAGEN"
-      return 0
-      ;;
-
-    "Kulturpresseschau - Deutschlandfunk Kultur")
-      echo "$KULTURPRESSESCHAU"
-      return 0
-      ;;
-
-    "Sternzeit - Deutschlandfunk")
-      echo "$STERNZEIT"
-      return 0
-      ;;
-
-    "WDR ZeitZeichen")
-      echo "$ZEITZEICHEN"
-      return 0
-      ;;
-
-    "Wissenschaft im Brennpunkt - Deutschlandfunk")
-      echo "$BRENNPUNKT"
-      return 0
-      ;;
-
-  esac
-
-  # notify user
-  failmsg "unknown feed: \"$1\""
-
-  # signalize trouble
-  return 1
 }
 
 # ---------
@@ -851,43 +517,6 @@ function get_year()
 
   # push year to stdout
   printf "%04d\n" "$UTCY"
-
-  # signalize success
-  return 0
-}
-
-# ---------
-# get_title
-# ---------
-#
-# $1  feed title
-# $2  episode title
-# $3  author
-# $4  UTC date
-#
-function get_title()
-{
-  # get year, month and day from date
-  local UTCY=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\1/p" <<< "$4")
-  local UTCM=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\2/p" <<< "$4")
-  local UTCD=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-0*([[:digit:]]+).+/\3/p" <<< "$4")
-
-  # get name from number
-  local NAME=$(get_month_name "$UTCM")
-
-  # ZeitZeichen
-  if [ "$1" == "WDR ZeitZeichen" ] ; then
-
-    # push title to stdout
-    ./fn.getzztitle "$2" "$4"
-
-  # default
-  else
-
-    # push title to stdout
-    echo "$2 ($3: $UTCD. $NAME $UTCY)"
-
-  fi
 
   # signalize success
   return 0
@@ -965,6 +594,9 @@ function format_authors()
 #   PULL_OUT_DIR
 #   PULL_OUT_MP3
 #   PULL_OUT_CFG
+#   PULL_DUR_MIN
+#   PULL_DUR_MAX
+#   PULL_DUR_CHK
 #   CFG_BACKGROUND
 #   CFG_FOREGROUND
 #   CFG_COMPRESSION
@@ -1017,6 +649,9 @@ function show_pull_file()
   echo "readonly OUT_DIR=\"$(quotable <<< $PULL_OUT_DIR)\""
   echo "readonly OUT_MP3=\"$(quotable <<< $PULL_OUT_MP3)\""
   echo "readonly OUT_CFG=\"$(quotable <<< $PULL_OUT_CFG)\""
+  echo "readonly DUR_MIN=\"$(quotable <<< $PULL_DUR_MIN)\""
+  echo "readonly DUR_MAX=\"$(quotable <<< $PULL_DUR_MAX)\""
+  echo "readonly DUR_CHK=\"$(quotable <<< $PULL_DUR_CHK)\""
   echo
   echo "# cfg information"
   echo "readonly CFG_BACKGROUND=\"$(quotable <<< $CFG_BACKGROUND)\""
@@ -1209,8 +844,57 @@ function show_pull_file()
   echo "}"
   echo
   echo "# ------------------------------------------------------------------------------"
+  echo "# options                                                                options"
+  echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# set default values"
+  echo "FORCE=\"0\""
+  echo
+  echo "# set options to accept"
+  echo "readonly KNOWN_OPTIONS=\":f\""
+  echo
+  echo "# check passed options"
+  echo "while getopts \"\$KNOWN_OPTIONS\" OPTION \"\$@\""
+  echo "do"
+  echo
+  echo "  case \"\$OPTION\" in"
+  echo
+  echo "    # show help"
+  echo "    \"f\") FORCE=\"1\""
+  echo "         ;;"
+  echo
+  echo "    \"?\") failmsg \"unknown option: -\$OPTARG\""
+  echo "         exit 1"
+  echo "         ;;"
+  echo
+  echo "    \":\") failmsg \"missing argument: -\$OPTARG <argument>\""
+  echo "         exit 1"
+  echo "         ;;"
+  echo
+  echo "  esac"
+  echo
+  echo "done"
+  echo
+  echo "# get number of positional parameters"
+  echo "PPNUM=\$(( \$# - OPTIND + 1 ))"
+  echo
+  echo "# drop all parsed options"
+  echo "shift \$(( OPTIND - 1 ))"
+  echo
+  echo "# ------------------------------------------------------------------------------"
   echo "# commands                                                              commands"
   echo "# ------------------------------------------------------------------------------"
+  echo
+  echo "# check number of positional parameters"
+  echo "if (( PPNUM != 0 )) ; then"
+  echo
+  echo "  # notify user"
+  echo "  failmsg \"no positional parameters allowed\""
+  echo
+  echo "  # signalize trouble"
+  echo "  exit 1"
+  echo
+  echo "fi"
   echo
   echo "# initialize the final tag for this file"
   echo "GLOBAL_FINALTAG=\"pull\""
@@ -1229,6 +913,33 @@ function show_pull_file()
   echo
   echo "    # notify user"
   echo "    failmsg \"unable to create target directory: \\\"\$OUT_DIR\\\"\""
+  echo
+  echo "    # signalize trouble"
+  echo "    exit 1"
+  echo
+  echo "  fi"
+  echo
+  echo "fi"
+  echo
+  echo "# check flag"
+  echo "if [ \"\$FORCE\" == \"0\" ] ; then"
+  echo
+  echo "  # check left threshold"
+  echo "  if [ \"\$DUR_CHK\" \\< \"\$DUR_MIN\" ] ; then"
+  echo
+  echo "    # notify user"
+  echo "    warnmsg \"\$0 is shorter than expected: \$DUR_CHK (use -f to download anyway)\""
+  echo
+  echo "    # signalize trouble"
+  echo "    exit 1"
+  echo
+  echo "  fi"
+  echo
+  echo "  # check right threshold"
+  echo "  if [ \"\$DUR_CHK\" \\> \"\$DUR_MAX\" ] ; then"
+  echo
+  echo "    # notify user"
+  echo "    warnmsg \"\$0 is longer than expected: \$DUR_CHK (use -f to download anyway)\""
   echo
   echo "    # signalize trouble"
   echo "    exit 1"
@@ -1289,10 +1000,24 @@ function show_pull_file()
 # ------------------------------------------------------------------------------
 
 # check number of parameters
-if (( $# != 1 )) ; then
+if (( $# != 2 )) ; then
 
   # notify user
-  failmsg "exactly one source file needed: $(basename "$0") <filename>"
+  failmsg "exactly two arguments needed: $(basename "$0") <item file> <feed file>"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# set item filename
+readonly ITEM_FILE="$1"
+
+# check file
+if [ ! -f "$ITEM_FILE" ] ; then
+
+  # notify user
+  failmsg "unable to locate file: \"$ITEM_FILE\""
 
   # signalize trouble
   exit 1
@@ -1300,7 +1025,7 @@ if (( $# != 1 )) ; then
 fi
 
 # set feed filename
-readonly FEED_FILE="$1"
+readonly FEED_FILE="$2"
 
 # check file
 if [ ! -f "$FEED_FILE" ] ; then
@@ -1347,13 +1072,13 @@ if [ ! -f "$DBFILE" ] ; then
 fi
 
 # get feed title once and convert text to ASCII
-readonly FEED_TITLE=$(get_feed_title "$FEED_FILE" | utf82ascii)
+readonly FEED_TITLE=$(get_feed_title "$ITEM_FILE" | utf82ascii)
 
 # check title
 if [ -z "$FEED_TITLE" ] ; then
 
   # notify user
-  failmsg "unable to extract feed name: \"$FEED_FILE\""
+  failmsg "unable to extract feed name: \"$ITEM_FILE\""
 
   # signalize trouble
   exit 1
@@ -1365,12 +1090,12 @@ while true
 do
 
   # read data from first item and convert text to ASCII
-        MEDIA=$(get_episode_media       "$FEED_FILE"                              )
-        TITLE=$(get_episode_title       "$FEED_FILE" | utf82ascii                 )
-         DATE=$(get_episode_date        "$FEED_FILE"                              )
-     DURATION=$(get_episode_duration    "$FEED_FILE"                              )
-       AUTHOR=$(get_episode_author      "$FEED_FILE" | utf82ascii | format_authors)
-  DESCRIPTION=$(get_episode_description "$FEED_FILE" | utf82ascii                 )
+        MEDIA=$(get_episode_media       "$ITEM_FILE"                              )
+        TITLE=$(get_episode_title       "$ITEM_FILE" | utf82ascii                 )
+         DATE=$(get_episode_date        "$ITEM_FILE"                              )
+     DURATION=$(get_episode_duration    "$ITEM_FILE"                              )
+       AUTHOR=$(get_episode_author      "$ITEM_FILE" | utf82ascii | format_authors)
+  DESCRIPTION=$(get_episode_description "$ITEM_FILE" | utf82ascii                 )
 
   # no more data
   [ -z "$MEDIA" ] && break
@@ -1446,19 +1171,22 @@ do
     PULL_OUT_DIR="../raw/"
     PULL_OUT_MP3="$PULLCORE.mp3"
     PULL_OUT_CFG="$PULLCORE.cfg"
+    PULL_DUR_MIN=$(bash "$FEED_FILE" -m)
+    PULL_DUR_MAX=$(bash "$FEED_FILE" -M)
+    PULL_DUR_CHK="$DURATION"
 
     # set cfg information
-    CFG_BACKGROUND=$(get_background_image "$FEED_TITLE")
+    CFG_BACKGROUND=$(bash "$FEED_FILE" -i)
     CFG_FOREGROUND=$(get_foreground_image "$UTC_DATE")
-    CFG_COMPRESSION=$(get_image_compression "$FEED_TITLE")
-    CFG_TOPDIR=$(get_topdir "$FEED_TITLE")
+    CFG_COMPRESSION=$(bash "$FEED_FILE" -q)
+    CFG_TOPDIR=$(bash "$FEED_FILE" -d)
     CFG_GENRE="Speech"
-    CFG_ARTIST=$(get_artist "$FEED_TITLE")
+    CFG_ARTIST=$(bash "$FEED_FILE" -a)
     CFG_ALBUM=$(get_album "$UTC_DATE")
     CFG_YEAR=$(get_year "$UTC_DATE")
-    CFG_AUTHOR="$AUTHOR"
-    CFG_TITLE=$(get_title "$FEED_TITLE" "$TITLE" "$CFG_AUTHOR" "$UTC_DATE")
+    CFG_TITLE=$(bash "$FEED_FILE" -t "$TITLE" "$AUTHOR" "$UTC_DATE")
     CFG_COMMENT="$DESCRIPTION"
+    CFG_AUTHOR="$AUTHOR"
     CFG_AIRTIME="$UTC_DATE"
     CFG_SORTKEY=$(simplify <<< "$(date -d "$UTC_DATE" +"%Y-%m-%d") $FEED_TITLE $(sec_to_midnight "$UTC_DATE")")
 
@@ -1477,7 +1205,7 @@ do
   fi
 
   # remove first item
-  drop_first_item "$FEED_FILE"
+  drop_first_item "$ITEM_FILE"
 
 done
 
