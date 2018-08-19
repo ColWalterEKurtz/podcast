@@ -81,44 +81,6 @@ function donemsg()
   echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
 }
 
-# ------------------
-# create_cover_image
-# ------------------
-#
-# $1  background image
-# $2  forefround image
-#
-function create_cover_image()
-{
-  # create temporary file
-  local TEMPFILE=$(mktemp --suffix ".png")
-
-  # composite png images
-  composite -gravity    "SouthWest"        \
-            "$2" "$1"                      \
-            -colorspace "sRGB"             \
-            -type       "TrueColorMatte"   \
-            -define     "png:bit-depth=8"  \
-            -define     "png:color-type=6" \
-            -define     "png:format=png32" \
-            "PNG32:$TEMPFILE"
-
-  # create multiple images
-  for PC in $(seq 80 100)
-  do
-
-    # set filename
-    local OUTFILE=$(printf "test-%03d.jpg" "$PC")
-
-    # convert to jpeg
-    convert "$TEMPFILE" -quality "$PC" "$OUTFILE"
-
-  done
-
-  # remove temporary file
-  rm -f "$TEMPFILE" 2>"/dev/null"
-}
-
 # ------------------------------------------------------------------------------
 # commands                                                              commands
 # ------------------------------------------------------------------------------
@@ -126,9 +88,35 @@ function create_cover_image()
 IMAGE_BACKGROUND="$1"
 IMAGE_FOREGROUND="$2"
 
-# create_cover_image
-create_cover_image "$IMAGE_BACKGROUND" "$IMAGE_FOREGROUND"
+# create temporary file
+TEMPFILE=$(mktemp --suffix ".png")
 
+# clean up on exit
+trap 'rm -f "$TEMPFILE"' EXIT
+
+# composite png images
+composite -gravity    "SouthWest"        \
+          "$2" "$1"                      \
+          -colorspace "sRGB"             \
+          -type       "TrueColorMatte"   \
+          -define     "png:bit-depth=8"  \
+          -define     "png:color-type=6" \
+          -define     "png:format=png32" \
+          "PNG32:$TEMPFILE"
+
+# create multiple images
+for PC in $(seq 80 100)
+do
+
+  # set filename
+  OUTFILE=$(printf "test-%03d.jpg" "$PC")
+
+  # convert to jpeg
+  convert "$TEMPFILE" -quality "$PC" "$OUTFILE"
+
+done
+
+# show file size
 du -b test-*.jpg
 
 # signalize success

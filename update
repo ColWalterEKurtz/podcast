@@ -7,7 +7,7 @@ TEMPFILE=$(mktemp)
 trap 'rm -f "$TEMPFILE"' EXIT
 
 # create pull files for these podcast feeds
-for URL in "https://www.deutschlandfunk.de/podcast-aus-kultur-und-sozialwissenschaften.1149.de.podcast" \
+for URL in "https://www.deutschlandfunk.de/podcast-aus-kultur-und-sozialwissenschaften.1149.de.podcast.xml" \
            "https://www.deutschlandfunk.de/podcast-computer-und-kommunikation-beitraege.685.de.podcast.xml" \
            "https://www.deutschlandfunk.de/podcast-dossier.1171.de.podcast.xml" \
            "https://www.deutschlandfunk.de/podcast-forschung-aktuell.677.de.podcast.xml" \

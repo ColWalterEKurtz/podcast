@@ -1,0 +1,143 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# cli                                                                        cli
+# ------------------------------------------------------------------------------
+
+# -a  artist to use in the local mp3 file
+# -d  topmost target directory
+# -i  path of the background image
+# -M  max duration to download automatically
+# -m  min diration to download automatically
+# -q  quality factor of the jpeg compression
+# -t  title to use in the local mp3 file; option arguments are:
+#       <title> <author> <date> 
+# -u  podcast url
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+
+# get month names in german
+export LC_TIME="de_DE.UTF-8"
+
+# for internal use
+readonly PODCASTDIR="$HOME/podcast"
+
+# invariable values
+readonly         URL="https://www.deutschlandfunk.de/essay-und-diskurs.1183.de.rss"
+readonly MINDURATION="00:25:00"
+readonly MAXDURATION="00:35:00"
+readonly      TOPDIR="$PODCASTDIR/audio/Essay/"
+readonly  BACKGROUND="$PODCASTDIR/images/essayunddiskurs.png"
+readonly     QUALITY="100"
+readonly      ARTIST="DLF - Essay und Diskurs"
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# URL
+if [ "$1" == "-u" ] ; then
+
+  # push URL to stdout
+  echo "$URL"
+
+  # signalize success
+  exit 0
+
+fi
+
+# min duration
+if [ "$1" == "-m" ] ; then
+
+  # push min HH:MM:SS to stdout
+  echo "$MINDURATION"
+
+  # signalize success
+  exit 0
+
+fi
+
+# min duration
+if [ "$1" == "-M" ] ; then
+
+  # push max HH:MM:SS to stdout
+  echo "$MAXDURATION"
+
+  # signalize success
+  exit 0
+
+fi
+
+# topmost target directory
+if [ "$1" == "-d" ] ; then
+
+  # push path to stdout
+  echo "$TOPDIR"
+
+  # signalize success
+  exit 0
+
+fi
+
+# path of the background image
+if [ "$1" == "-i" ] ; then
+
+  # push path to stdout
+  echo "$BACKGROUND"
+
+  # signalize success
+  exit 0
+
+fi
+
+# quality factor of the jpeg compression
+if [ "$1" == "-q" ] ; then
+
+  # push factor to stdout
+  echo "$QUALITY"
+
+  # signalize success
+  exit 0
+
+fi
+
+# artist
+if [ "$1" == "-a" ] ; then
+
+  # push artist to stdout
+  echo "$ARTIST"
+
+  # signalize success
+  exit 0
+
+fi
+
+# title
+if [ "$1" == "-t" ] ; then
+
+  # get option arguments
+   EPTITLE="$2"
+  EPAUTHOR="$3"
+    EPDATE="$4"
+
+  # set missing values
+  [ -z "$EPTITLE"  ] && EPTITLE="TITLE"
+  [ -z "$EPAUTHOR" ] && EPAUTHOR="LASTNAME, FIRSTNAME"
+  [ -z "$EPDATE"   ] && EPDATE=$(date -u "+%Y-%m-%d %H:%M:%S %Z")
+
+  # get date's title format
+  MYDATE=$(date -d "$EPDATE" "+%-d. %B %Y" 2>"/dev/null")
+
+  # push title to stdout
+  echo "$EPTITLE ($EPAUTHOR: $MYDATE)"
+
+  # signalize success
+  exit 0
+
+fi
+
+# signalize trouble
+exit 1
+

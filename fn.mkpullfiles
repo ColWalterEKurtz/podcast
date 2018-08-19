@@ -272,11 +272,11 @@ function get_episode_media()
         # limit scope to first item
         /^ITEM=BEGIN/,/^ITEM=END/ {
 
+          # stop after first item
+          /^ITEM=END/ { q }
+
           # crop title
           s/^MEDIA=(.+)/\1/p
-
-          # stop after first item
-         /^ITEM=END/ { q }
 
         }
 
@@ -298,11 +298,11 @@ function get_episode_title()
         # limit scope to first item
         /^ITEM=BEGIN/,/^ITEM=END/ {
 
+          # stop after first item
+          /^ITEM=END/ { q }
+
           # crop title
           s/^TITLE=(.+)/\1/p
-
-          # stop after first item
-         /^ITEM=END/ { q }
 
         }
 
@@ -324,11 +324,11 @@ function get_episode_author()
         # limit scope to first item
         /^ITEM=BEGIN/,/^ITEM=END/ {
 
+          # stop after first item
+          /^ITEM=END/ { q }
+
           # crop author
           s/^AUTHOR=(.+)/\1/p
-
-          # stop after first item
-         /^ITEM=END/ { q }
 
         }
 
@@ -350,11 +350,11 @@ function get_episode_date()
         # limit scope to first item
         /^ITEM=BEGIN/,/^ITEM=END/ {
 
+          # stop after first item
+          /^ITEM=END/ { q }
+
           # crop date
           s/^DATE=(.+)/\1/p
-
-          # stop after first item
-         /^ITEM=END/ { q }
 
         }
 
@@ -376,12 +376,46 @@ function get_episode_description()
         # limit scope to first item
         /^ITEM=BEGIN/,/^ITEM=END/ {
 
+          # stop after first item
+          /^ITEM=END/ { q }
+
           # crop description
           s/^DESCRIPTION=(.+)/\1/p
 
-          # stop after first item
-         /^ITEM=END/ { q }
+        }
 
+      " "$1"
+}
+
+# --------------------
+# get_episode_duration
+# --------------------
+#
+# $1  feed file
+#
+function get_episode_duration()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # limit scope to first item
+        /^ITEM=BEGIN/,/^ITEM=END/ {
+
+          # stop after first item
+          /^ITEM=END/ { q }
+
+          # crop description
+          s/^DURATION=(.+)/\1/ ; T
+
+          # HH:MM:SS
+          s/^[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}$/&/p ; t
+
+          # MM:SS
+          s/^[[:digit:]]{2}:[[:digit:]]{2}$/00:&/p ; t
+
+          # SS
+          s/^[[:digit:]]{2}$/00:00:&/p ; t
         }
 
       " "$1"
@@ -859,16 +893,15 @@ function get_title()
   return 0
 }
 
-# ----------
-# get_author
-# ----------
+# --------------
+# format_authors
+# --------------
 #
-# $1  author
+# ... | format_authors | ...
 #
-function get_author()
+function format_authors()
 {
-  echo "$1"               \
-  | sed --regexp-extended \
+  sed --regexp-extended \
         --expression="
 
           # replace each 'und' with a real separator
@@ -891,6 +924,7 @@ function get_author()
             s/^ *(.+[^ ]) +([^ ]+) *$/\2, \1/
 
           }
+
         "                 \
   | sed --quiet           \
         --regexp-extended \
@@ -918,10 +952,8 @@ function get_author()
             # print one single line
             p
           }
-        "
 
-  # signalize success
-  return 0
+        "
 }
 
 # --------------
@@ -1333,11 +1365,12 @@ while true
 do
 
   # read data from first item and convert text to ASCII
-        MEDIA=$(get_episode_media       "$FEED_FILE"             )
-        TITLE=$(get_episode_title       "$FEED_FILE" | utf82ascii)
-       AUTHOR=$(get_episode_author      "$FEED_FILE" | utf82ascii)
-         DATE=$(get_episode_date        "$FEED_FILE"             )
-  DESCRIPTION=$(get_episode_description "$FEED_FILE" | utf82ascii)
+        MEDIA=$(get_episode_media       "$FEED_FILE"                              )
+        TITLE=$(get_episode_title       "$FEED_FILE" | utf82ascii                 )
+         DATE=$(get_episode_date        "$FEED_FILE"                              )
+     DURATION=$(get_episode_duration    "$FEED_FILE"                              )
+       AUTHOR=$(get_episode_author      "$FEED_FILE" | utf82ascii | format_authors)
+  DESCRIPTION=$(get_episode_description "$FEED_FILE" | utf82ascii                 )
 
   # no more data
   [ -z "$MEDIA" ] && break
@@ -1381,6 +1414,17 @@ do
 
   fi
 
+  # duration is needed
+  if [ -z "$DURATION"  ] ; then
+
+    # notify user
+    failmsg "no DURATION found in $MEDIA"
+
+    # signalize trouble
+    exit 1
+
+  fi
+
   # additional data missing
   [ -z "$AUTHOR"      ] && warnmsg "no AUTHOR found in $MEDIA"
   [ -z "$DESCRIPTION" ] && warnmsg "no DESCRIPTION found in $MEDIA"
@@ -1412,7 +1456,7 @@ do
     CFG_ARTIST=$(get_artist "$FEED_TITLE")
     CFG_ALBUM=$(get_album "$UTC_DATE")
     CFG_YEAR=$(get_year "$UTC_DATE")
-    CFG_AUTHOR=$(get_author "$AUTHOR")
+    CFG_AUTHOR="$AUTHOR"
     CFG_TITLE=$(get_title "$FEED_TITLE" "$TITLE" "$CFG_AUTHOR" "$UTC_DATE")
     CFG_COMMENT="$DESCRIPTION"
     CFG_AIRTIME="$UTC_DATE"
