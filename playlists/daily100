@@ -211,7 +211,7 @@ function update_keyfile()
 # ------------------------------------------------------------------------------
 
 # set default value (all episodes)
-EPISODES="bcdefhupksz"
+EPISODES="bcdewfhupksz"
 
 if (( $# == 1 )) ; then
 
@@ -222,7 +222,7 @@ if (( $# == 1 )) ; then
     {
 
       echo
-      echo "  daily100 [-h|bcdefhupksz]"
+      echo "  daily100 [-h|$EPISODES]"
       echo
       echo "  -h   show help and exit"
       echo
@@ -230,6 +230,7 @@ if (( $# == 1 )) ; then
       echo "   c   search ComKom/            directory"
       echo "   d   search Dossier/           directory"
       echo "   e   search Essay/             directory"
+      echo "   w   search EineWelt/          directory"
       echo "   f   search Forschung/         direktory"
       echo "   h   search Hintergrund/       directory"
       echo "   u   search Kulturfragen/      directory"
@@ -298,6 +299,7 @@ REGEXP[b]="/Brennpunkt/"
 REGEXP[c]="/ComKom/"
 REGEXP[d]="/Dossier/"
 REGEXP[e]="/Essay/"
+REGEXP[w]="/EineWelt/"
 REGEXP[f]="/Forschung/"
 REGEXP[h]="/Hintergrund/"
 REGEXP[u]="/Kulturfragen/"
