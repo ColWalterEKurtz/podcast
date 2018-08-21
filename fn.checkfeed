@@ -253,7 +253,12 @@ function get_items()
             s/\]\]>//g
             s/<[^>]+>/ /g
             s/&#[Xx][Dd];/ /g
+
+            # unescape these escape sequences
             s/&[Aa][Mm][Pp];/\&/g
+            s/&[Qq][Uu][Oo][Tt];/\"/g
+            s/&[Ll][Tt];/</g
+            s/&[Gg][Tt];/>/g
 
             # append to hold space
             H
