@@ -29,11 +29,14 @@ readonly MAGENTA=$(tput setaf 5)
 readonly    CYAN=$(tput setaf 6)
 readonly   WHITE=$(tput setaf 7)
 
-# pull files will be created in this directory
-readonly PULLDIR="pull/"
+# the podcast directory
+readonly PODCASTDIR="$HOME/podcast/"
 
-# the list of pull files that have been created once
-readonly DBFILE="pulldb"
+# pull files will be created in this directory
+readonly PULLDIR="${PODCASTDIR}pull/"
+
+# the list of pull files that already have been created
+readonly DBFILE="${PODCASTDIR}pulldb"
 
 # ------------------------------------------------------------------------------
 # functions                                                            functions
@@ -50,7 +53,6 @@ function failmsg()
   # push to stderr
   echo -e "${RED}[FAIL]${NONE} $1" 1>&2
 }
-
 # -------
 # warnmsg
 # -------
@@ -240,7 +242,7 @@ function get_month_name()
 # get_feed_title
 # --------------
 #
-# $1  feed file
+# ... | get_feed_title | ...
 #
 function get_feed_title()
 {
@@ -254,207 +256,153 @@ function get_feed_title()
         # quit after first substitution
         T ; q
 
-      " "$1"
+      "
 }
 
-# -----------------
-# get_episode_media
-# -----------------
+# -----------
+# unify_title
+# -----------
 #
-# $1  feed file
+# ... | unify_title | ...
 #
-function get_episode_media()
+function unify_title()
+{
+  sed --regexp-extended \
+      --expression="
+
+        # replace all double quotes by single quotes
+        s/\"/'/g
+
+        # trim line
+        s/[[:space:]]+/ /g
+        s/^ //
+        s/ $//
+
+      " \
+  | utf82ascii
+}
+
+# ----------
+# unify_date
+# ----------
+#
+# ... | unify_date | ...
+#
+function unify_date()
+{
+  xargs -L1 -I'{}' date -ud '{}' "+%Y-%m-%d %H:%M:%S %Z" 2>"/dev/null" | utf82ascii
+}
+
+# --------------
+# unify_duration
+# --------------
+#
+# ... | unify_duration | ...
+#
+function unify_duration()
 {
   sed --quiet           \
       --regexp-extended \
       --expression="
 
-        # limit scope to first item
-        /^ITEM=BEGIN/,/^ITEM=END/ {
+        # HH:MM:SS
+        s/^[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}$/&/p ; t
 
-          # stop after first item
-          /^ITEM=END/ { q }
+        # MM:SS
+        s/^[[:digit:]]{2}:[[:digit:]]{2}$/00:&/p ; t
 
-          # crop title
-          s/^MEDIA=(.+)/\1/p
+        # SS
+        s/^[[:digit:]]{2}$/00:00:&/p ; t
 
-        }
-
-      " "$1"
+      " \
+  | utf82ascii
 }
 
-# -----------------
-# get_episode_title
-# -----------------
+# ------------
+# unify_author
+# ------------
 #
-# $1  feed file
+# ... | unify_author | ...
 #
-function get_episode_title()
+function unify_author()
 {
-  sed --quiet           \
-      --regexp-extended \
+  sed --regexp-extended \
       --expression="
 
-        # limit scope to first item
-        /^ITEM=BEGIN/,/^ITEM=END/ {
+        # replace each 'und' with a real separator
+        s/ und / ; /g
 
-          # stop after first item
-          /^ITEM=END/ { q }
+        # replace each slash with a real separator
+        s|/|;|g
 
-          # crop title
-          s/^TITLE=(.+)/\1/p
+        # split line at each semicolon
+        s/;/\x0A/g
 
-        }
+      "                   \
+  | sed --regexp-extended \
+        --expression="
 
-      " "$1"
-}
+          # operate lines without comma
+          /,/! {
 
-# ------------------
-# get_episode_author
-# ------------------
-#
-# $1  feed file
-#
-function get_episode_author()
-{
-  sed --quiet           \
-      --regexp-extended \
-      --expression="
-
-        # limit scope to first item
-        /^ITEM=BEGIN/,/^ITEM=END/ {
-
-          # stop after first item
-          /^ITEM=END/ { q }
-
-          # crop author
-          s/^AUTHOR=(.+)/\1/p
-
-        }
-
-      " "$1"
-}
-
-# ----------------
-# get_episode_date
-# ----------------
-#
-# $1  feed file
-#
-function get_episode_date()
-{
-  sed --quiet           \
-      --regexp-extended \
-      --expression="
-
-        # limit scope to first item
-        /^ITEM=BEGIN/,/^ITEM=END/ {
-
-          # stop after first item
-          /^ITEM=END/ { q }
-
-          # crop date
-          s/^DATE=(.+)/\1/p
-
-        }
-
-      " "$1"
-}
-
-# -----------------------
-# get_episode_description
-# -----------------------
-#
-# $1  feed file
-#
-function get_episode_description()
-{
-  sed --quiet           \
-      --regexp-extended \
-      --expression="
-
-        # limit scope to first item
-        /^ITEM=BEGIN/,/^ITEM=END/ {
-
-          # stop after first item
-          /^ITEM=END/ { q }
-
-          # crop description
-          s/^DESCRIPTION=(.+)/\1/p
-
-        }
-
-      " "$1"
-}
-
-# --------------------
-# get_episode_duration
-# --------------------
-#
-# $1  feed file
-#
-function get_episode_duration()
-{
-  sed --quiet           \
-      --regexp-extended \
-      --expression="
-
-        # limit scope to first item
-        /^ITEM=BEGIN/,/^ITEM=END/ {
-
-          # stop after first item
-          /^ITEM=END/ { q }
-
-          # crop description
-          s/^DURATION=(.+)/\1/ ; T
-
-          # HH:MM:SS
-          s/^[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}$/&/p ; t
-
-          # MM:SS
-          s/^[[:digit:]]{2}:[[:digit:]]{2}$/00:&/p ; t
-
-          # SS
-          s/^[[:digit:]]{2}$/00:00:&/p ; t
-        }
-
-      " "$1"
-}
-
-# ---------------
-# drop_first_item
-# ---------------
-#
-# $1  feed file
-#
-function drop_first_item()
-{
-  sed --quiet           \
-      --in-place        \
-      --regexp-extended \
-      --expression="
-
-        # first item found
-        /^ITEM=BEGIN/ {
-
-          :skip
-
-          # first item finished
-          /^ITEM=END/ {
-
-            # print succeeding lines
-            :show n ; p ; b show
+            # swap first and last name
+            s/^ *(.+[^ ]) +([^ ]+) *$/\2, \1/
 
           }
 
-          # next line from first item
-          n ; b skip
-        }
+        "                 \
+  | sed --quiet           \
+        --regexp-extended \
+        --expression="
 
-        # print preceeding lines
-        p
+          # append pattern to hold space
+          H
 
-      " "$1"
+          # last line
+          $ {
+
+            # copy hold to pattern space
+            g
+
+            # concatenate all lines
+            s/\x0A/; /g
+
+            # let each separator be followed by space
+            s/ *([,;]) */\1 /g
+
+            # trim both ends
+            s/^[; ]+//
+            s/[; ]+$//
+
+            # print one single line
+            p
+          }
+
+        " \
+  | utf82ascii
+}
+
+# -----------------
+# unify_description
+# -----------------
+#
+# ... | unify_description | ...
+#
+function unify_description()
+{
+  sed --regexp-extended \
+      --expression="
+
+        # replace all double quotes by single quotes
+        s/\"/'/g
+
+        # trim line
+        s/[[:space:]]+/ /g
+        s/^ //
+        s/ $//
+
+      " \
+  | utf82ascii
 }
 
 # --------------------
@@ -466,7 +414,7 @@ function drop_first_item()
 function get_foreground_image()
 {
   # source directory for all date files
-  local readonly IMAGEDIR="../images/months/"
+  local readonly IMAGEDIR="${PODCASTDIR}/images/months/"
 
   # get year and month from date
   local UTCY=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-.+/\1/p" <<< "$1")
@@ -520,69 +468,6 @@ function get_year()
 
   # signalize success
   return 0
-}
-
-# --------------
-# format_authors
-# --------------
-#
-# ... | format_authors | ...
-#
-function format_authors()
-{
-  sed --regexp-extended \
-        --expression="
-
-          # replace each 'und' with a real separator
-          s/ und / ; /g
-
-          # replace each slash with a real separator
-          s|/|;|g
-
-          # split line at each semicolon
-          s/;/\x0A/g
-
-        "                 \
-  | sed --regexp-extended \
-        --expression="
-
-          # operate lines without comma
-          /,/! {
-
-            # swap first and last name
-            s/^ *(.+[^ ]) +([^ ]+) *$/\2, \1/
-
-          }
-
-        "                 \
-  | sed --quiet           \
-        --regexp-extended \
-        --expression="
-
-          # append pattern to hold space
-          H
-
-          # last line
-          $ {
-
-            # copy hold to pattern space
-            g
-
-            # concatenate all lines
-            s/\x0A/; /g
-
-            # let each separator be followed by space
-            s/ *([,;]) */\1 /g
-
-            # trim both ends
-            s/^[; ]+//
-            s/[; ]+$//
-
-            # print one single line
-            p
-          }
-
-        "
 }
 
 # --------------
@@ -1072,7 +957,7 @@ if [ ! -f "$DBFILE" ] ; then
 fi
 
 # get feed title once and convert text to ASCII
-readonly FEED_TITLE=$(get_feed_title "$ITEM_FILE" | utf82ascii)
+readonly FEED_TITLE=$(get_feed_title < "$ITEM_FILE" | utf82ascii)
 
 # check title
 if [ -z "$FEED_TITLE" ] ; then
@@ -1085,129 +970,134 @@ if [ -z "$FEED_TITLE" ] ; then
 
 fi
 
+# number of episodes that have been downloaded already
+OLDCOUNT=0
+
 # read all items from feed file
-while true
+while read -r LINE
 do
 
-  # read data from first item and convert text to ASCII
-        MEDIA=$(get_episode_media       "$ITEM_FILE"                              )
-        TITLE=$(get_episode_title       "$ITEM_FILE" | utf82ascii                 )
-         DATE=$(get_episode_date        "$ITEM_FILE"                              )
-     DURATION=$(get_episode_duration    "$ITEM_FILE"                              )
-       AUTHOR=$(get_episode_author      "$ITEM_FILE" | utf82ascii | format_authors)
-  DESCRIPTION=$(get_episode_description "$ITEM_FILE" | utf82ascii                 )
+  # item finished (skating on thin ice)
+  if [ "$LINE" == "ITEM=END" ] ; then
 
-  # no more data
-  [ -z "$MEDIA" ] && break
+    # check data
+    [ -z "$MEDIA"       ] && { failmsg "no MEDIA found in item"         ; exit 1 ; }
+    [ -z "$TITLE"       ] && { failmsg "no TITLE found in $MEDIA"       ; exit 1 ; }
+    [ -z "$DATE"        ] && { failmsg "no DATE found in $MEDIA"        ; exit 1 ; }
+    [ -z "$DURATION"    ] && { failmsg "no DURATION found in $MEDIA"    ; exit 1 ; }
+    [ -z "$AUTHOR"      ] && { warnmsg "no AUTHOR found in $MEDIA"      ;          }
+    [ -z "$DESCRIPTION" ] && { warnmsg "no DESCRIPTION found in $MEDIA" ;          }
 
-  # get hash value of this url
-  MEDIAHASH=$(sha1sum <<< "$MEDIA" | sed -re "s/ .+//")
+    # unify data
+          TITLE=$(unify_title       <<< "$TITLE"      )
+           DATE=$(unify_date        <<< "$DATE"       )
+       DURATION=$(unify_duration    <<< "$DURATION"   )
+         AUTHOR=$(unify_author      <<< "$AUTHOR"     )
+    DESCRIPTION=$(unify_description <<< "$DESCRIPTION")
 
-  # title is needed
-  if [ -z "$TITLE" ] ; then
+    # check data
+    [ -z "$TITLE"       ] && { failmsg "unable to unify TITLE in $MEDIA"       ; exit 1 ; }
+    [ -z "$DATE"        ] && { failmsg "unable to unify DATE in $MEDIA"        ; exit 1 ; }
+    [ -z "$DURATION"    ] && { failmsg "unable to unify DURATION in $MEDIA"    ; exit 1 ; }
+    [ -z "$AUTHOR"      ] && { warnmsg "unable to unify AUTHOR in $MEDIA"      ;          }
+    [ -z "$DESCRIPTION" ] && { warnmsg "unable to unify DESCRIPTION in $MEDIA" ;          }
 
-    # notify user
-    failmsg "no TITLE found in $MEDIA"
+    # get hash value of this url
+    MEDIAHASH=$(sha1sum <<< "$MEDIA" | sed -re "s/ .+//")
 
-    # signalize trouble
-    exit 1
+    # set core of each filename
+    PULLCORE=$(simplify <<< "$DATE $FEED_TITLE $MEDIAHASH")
 
-  fi
+    # set filename of the resulting pull file
+    PULLFILE="$PULLCORE.pull"
 
-  # date is needed
-  if [ -z "$DATE"  ] ; then
+    # check if pull file has already been created
+    if LC_ALL=C grep -Fq "$PULLFILE" "$DBFILE" ; then
 
-    # notify user
-    failmsg "no DATE found in $MEDIA"
+      # step counter
+      (( OLDCOUNT += 1 ))
 
-    # signalize trouble
-    exit 1
+      # exit loop
+      (( OLDCOUNT > 30 )) && break
 
-  fi
+      # notify user
+      infomsg "pull file has already been created: $PULLFILE"
 
-  # use own format
-  UTC_DATE=$(date -d "$DATE" -u +"%Y-%m-%d %H:%M:%S %Z" 2>"/dev/null")
+    # create related pull file
+    else
 
-  # check own format
-  if [ -z "$UTC_DATE" ] ; then
+      # reset counter
+      OLDCOUNT=0
 
-    # notify user
-    failmsg "unable to convert date: $DATE"
+      # set pull information
+      PULL_WEB_SRC="$MEDIA"
+      PULL_OUT_DIR="../raw/"
+      PULL_OUT_MP3="$PULLCORE.mp3"
+      PULL_OUT_CFG="$PULLCORE.cfg"
+      PULL_DUR_MIN=$(bash "$FEED_FILE" -m)
+      PULL_DUR_MAX=$(bash "$FEED_FILE" -M)
+      PULL_DUR_CHK="$DURATION"
 
-    # signalize trouble
-    exit 1
+      # set cfg information
+      CFG_BACKGROUND=$(bash "$FEED_FILE" -i)
+      CFG_FOREGROUND=$(get_foreground_image "$DATE")
+      CFG_COMPRESSION=$(bash "$FEED_FILE" -q)
+      CFG_TOPDIR=$(bash "$FEED_FILE" -d)
+      CFG_GENRE="Speech"
+      CFG_ARTIST=$(bash "$FEED_FILE" -a)
+      CFG_ALBUM=$(get_album "$DATE")
+      CFG_YEAR=$(get_year "$DATE")
+      CFG_TITLE=$(bash "$FEED_FILE" -t "$TITLE" "$AUTHOR" "$DATE")
+      CFG_COMMENT="$DESCRIPTION"
+      CFG_AUTHOR="$AUTHOR"
+      CFG_AIRTIME="$DATE"
+      CFG_SORTKEY=$(simplify <<< "$(date -d "$DATE" +"%Y-%m-%d") $FEED_TITLE $(sec_to_midnight "$DATE")")
 
-  fi
+      # create pull file
+      show_pull_file > "$PULLDIR$PULLFILE"
 
-  # duration is needed
-  if [ -z "$DURATION"  ] ; then
+      # set executable
+      chmod u+x "$PULLDIR$PULLFILE"
 
-    # notify user
-    failmsg "no DURATION found in $MEDIA"
+      # add pull file to database
+      echo "$PULLFILE" >> "$DBFILE"
 
-    # signalize trouble
-    exit 1
+      # show progress
+      donemsg "pull file created: $PULLFILE"
 
-  fi
+    fi
 
-  # additional data missing
-  [ -z "$AUTHOR"      ] && warnmsg "no AUTHOR found in $MEDIA"
-  [ -z "$DESCRIPTION" ] && warnmsg "no DESCRIPTION found in $MEDIA"
+  # item started (skating on thin ice)
+  elif [ "$LINE" == "ITEM=BEGIN" ] ; then
 
-  # set filenames
-  PULLCORE=$(simplify <<< "$UTC_DATE $FEED_TITLE $MEDIAHASH")
-  PULLFILE="$PULLCORE.pull"
+    # reset data
+    MEDIA=""
+    TITLE=""
+    AUTHOR=""
+    DATE=""
+    DESCRIPTION=""
+    DURATION=""
 
-  # check if pull file has already been created
-  if egrep -q "^$PULLFILE$" "$DBFILE" ; then
-
-    # notify user
-    infomsg "pull file has already been created: $PULLFILE"
-
+  # get information from tagged line
   else
 
-    # set pull information
-    PULL_WEB_SRC="$MEDIA"
-    PULL_OUT_DIR="../raw/"
-    PULL_OUT_MP3="$PULLCORE.mp3"
-    PULL_OUT_CFG="$PULLCORE.cfg"
-    PULL_DUR_MIN=$(bash "$FEED_FILE" -m)
-    PULL_DUR_MAX=$(bash "$FEED_FILE" -M)
-    PULL_DUR_CHK="$DURATION"
+    # split tagged line
+    KEY=$(sed -nre "s/^([^=]+)=(.+)/\1/p" <<< "$LINE")
+    VAL=$(sed -nre "s/^([^=]+)=(.+)/\2/p" <<< "$LINE")
 
-    # set cfg information
-    CFG_BACKGROUND=$(bash "$FEED_FILE" -i)
-    CFG_FOREGROUND=$(get_foreground_image "$UTC_DATE")
-    CFG_COMPRESSION=$(bash "$FEED_FILE" -q)
-    CFG_TOPDIR=$(bash "$FEED_FILE" -d)
-    CFG_GENRE="Speech"
-    CFG_ARTIST=$(bash "$FEED_FILE" -a)
-    CFG_ALBUM=$(get_album "$UTC_DATE")
-    CFG_YEAR=$(get_year "$UTC_DATE")
-    CFG_TITLE=$(bash "$FEED_FILE" -t "$TITLE" "$AUTHOR" "$UTC_DATE")
-    CFG_COMMENT="$DESCRIPTION"
-    CFG_AUTHOR="$AUTHOR"
-    CFG_AIRTIME="$UTC_DATE"
-    CFG_SORTKEY=$(simplify <<< "$(date -d "$UTC_DATE" +"%Y-%m-%d") $FEED_TITLE $(sec_to_midnight "$UTC_DATE")")
-
-    # create pull file
-    show_pull_file > "$PULLDIR$PULLFILE"
-
-    # set executable
-    chmod u+x "$PULLDIR$PULLFILE"
-
-    # add pull file to database
-    echo "$PULLFILE" >> "$DBFILE"
-
-    # show progress
-    donemsg "pull file created: $PULLFILE"
+    # set data
+    case "$KEY" in
+            "MEDIA")       MEDIA="$VAL" ;;
+            "TITLE")       TITLE="$VAL" ;;
+           "AUTHOR")      AUTHOR="$VAL" ;;
+             "DATE")        DATE="$VAL" ;;
+      "DESCRIPTION") DESCRIPTION="$VAL" ;;
+         "DURATION")    DURATION="$VAL" ;;
+    esac
 
   fi
 
-  # remove first item
-  drop_first_item "$ITEM_FILE"
-
-done
+done < "$ITEM_FILE"
 
 # keep database sorted
 sort -uo "$DBFILE" "$DBFILE"
