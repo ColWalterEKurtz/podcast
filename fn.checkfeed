@@ -259,6 +259,8 @@ function get_items()
             s/&[Qq][Uu][Oo][Tt];/\"/g
             s/&[Ll][Tt];/</g
             s/&[Gg][Tt];/>/g
+            s/&#[Xx]22;/\"/g
+            s/&#[Xx]27;/'/g
 
             # append to hold space
             H
