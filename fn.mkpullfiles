@@ -1005,6 +1005,9 @@ do
     # get hash value of this url
     MEDIAHASH=$(sha1sum <<< "$MEDIA" | sed -re "s/ .+//")
 
+    # set database entry (end with MEDIAHASH)
+    DBENTRY="$DATE $FEED_TITLE $TITLE @ $MEDIAHASH"
+
     # set core of each filename
     PULLCORE=$(simplify <<< "$DATE $FEED_TITLE $MEDIAHASH")
 
@@ -1012,7 +1015,7 @@ do
     PULLFILE="$PULLCORE.pull"
 
     # check if pull file has already been created
-    if LC_ALL=C grep -Fq "$PULLFILE" "$DBFILE" ; then
+    if LC_ALL=C grep -q "$MEDIAHASH$" "$DBFILE" ; then
 
       # step counter
       (( OLDCOUNT += 1 ))
@@ -1059,8 +1062,8 @@ do
       # set executable
       chmod u+x "$PULLDIR$PULLFILE"
 
-      # add pull file to database
-      echo "$PULLFILE" >> "$DBFILE"
+      # add ID to database
+      echo "$DBENTRY" >> "$DBFILE"
 
       # show progress
       donemsg "pull file created: $PULLFILE"
