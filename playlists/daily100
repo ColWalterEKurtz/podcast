@@ -240,6 +240,8 @@ if (( $# == 1 )) ; then
       echo "   s   search Sternzeit/         directory"
       echo "   z   search ZeitZeichen/       directory"
       echo
+      echo "   N   bcfks"
+      echo
       echo "   default is: $EPISODES"
       echo
 
@@ -250,8 +252,18 @@ if (( $# == 1 )) ; then
 
   else
 
-    # use given argument
-    EPISODES="$1"
+    # translate N
+    if [ "$1" == "N" ] ; then
+
+      # use these feeds
+      EPISODES="bcfks"
+
+    else
+
+      # use given argument
+      EPISODES="$1"
+
+    fi
 
   fi
 
