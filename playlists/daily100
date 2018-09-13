@@ -241,6 +241,7 @@ if (( $# == 1 )) ; then
       echo "   z   search ZeitZeichen/       directory"
       echo
       echo "   N   bcfks"
+      echo "   S   derupk"
       echo
       echo "   default is: $EPISODES"
       echo
@@ -257,6 +258,12 @@ if (( $# == 1 )) ; then
 
       # use these feeds
       EPISODES="bcfks"
+
+    # translate S
+    elif [ "$1" == "S" ] ; then
+
+      # use these feeds
+      EPISODES="derupk"
 
     else
 
