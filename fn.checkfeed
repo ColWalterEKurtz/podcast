@@ -203,11 +203,20 @@ function get_items()
           # end item
           s/^<\/[Ii][Tt][Ee][Mm]>/ITEM=END/p
 
-          # title
-          s/^<[Tt][Ii][Tt][Ll][Ee]>[[:space:]]*(.+)[[:space:]]*$/TITLE=\1/p
-
           # media
           s/^<[Ee][Nn][Cc][Ll][Oo][Ss][Uu][Rr][Ee].+[Uu][Rr][Ll]=\"([^\"]+\.[Mm][Pp]3)\".+/MEDIA=\1/p
+
+          # unescape these escape sequences (not for MEDIA)
+          s/&[Aa][Mm][Pp];/\&/g
+          s/&[Qq][Uu][Oo][Tt];/\"/g
+          s/&[Ll][Tt];/</g
+          s/&[Gg][Tt];/>/g
+          s/&#[Xx]22;/\"/g
+          s/&#[Xx]27;/'/g
+          s/&[Qq][Uu][Oo][Tt];/\"/g
+
+          # title
+          s/^<[Tt][Ii][Tt][Ll][Ee]>[[:space:]]*(.+)[[:space:]]*$/TITLE=\1/p
 
           # date
           s/^<[Pp][Uu][Bb][Dd][Aa][Tt][Ee]>(.+)/DATE=\1/p
@@ -253,15 +262,6 @@ function get_items()
             s/\]\]>//g
             s/<[^>]+>/ /g
             s/&#[Xx][Dd];/ /g
-
-            # unescape these escape sequences
-            s/&[Aa][Mm][Pp];/\&/g
-            s/&[Qq][Uu][Oo][Tt];/\"/g
-            s/&[Ll][Tt];/</g
-            s/&[Gg][Tt];/>/g
-            s/&#[Xx]22;/\"/g
-            s/&#[Xx]27;/'/g
-            s/&[Qq][Uu][Oo][Tt];/\"/g
 
             # append to hold space
             H
