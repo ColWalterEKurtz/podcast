@@ -5,6 +5,8 @@
 # ------------------------------------------------------------------------------
 
 # -a  artist to use in the local mp3 file
+# -c  comment to use in the local mp3 file; option arguments are:
+#       <description>
 # -d  topmost target directory
 # -i  path of the background image
 # -M  max duration to download automatically
@@ -108,6 +110,20 @@ if [ "$1" == "-a" ] ; then
 
   # push artist to stdout
   echo "$ARTIST"
+
+  # signalize success
+  exit 0
+
+fi
+
+# comment
+if [ "$1" == "-c" ] ; then
+
+  # get option arguments
+  DESCRIPTION="$2"
+
+  # remove trailing gargabe
+  sed -re "s|[[:space:]]*www\.deutschlandfunk\.de, Hintergrund.+||" <<< "$DESCRIPTION"
 
   # signalize success
   exit 0

@@ -27,13 +27,13 @@ export LC_TIME="de_DE.UTF-8"
 readonly PODCASTDIR="$HOME/podcast"
 
 # invariable values
-readonly         URL="https://www.deutschlandfunkkultur.de/podcast-kulturpresseschau.1060.de.podcast.xml"
-readonly MINDURATION="00:03:00"
-readonly MAXDURATION="00:07:00"
-readonly      TOPDIR="$PODCASTDIR/audio/Kulturpresseschau/"
-readonly  BACKGROUND="$PODCASTDIR/images/kulturpresseschau.png"
-readonly     QUALITY="99"
-readonly      ARTIST="DRK - Kulturpresseschau"
+readonly         URL="https://www.deutschlandfunk.de/podcast-das-feature.1248.de.podcast.xml"
+readonly MINDURATION="00:40:00"
+readonly MAXDURATION="00:50:00"
+readonly      TOPDIR="$PODCASTDIR/audio/Feature/"
+readonly  BACKGROUND="$PODCASTDIR/images/feature.png"
+readonly     QUALITY="100"
+readonly      ARTIST="DLF - Das Feature"
 
 # ------------------------------------------------------------------------------
 # commands                                                              commands
@@ -123,7 +123,7 @@ if [ "$1" == "-c" ] ; then
   DESCRIPTION="$2"
 
   # remove trailing gargabe
-  sed -re "s|[[:space:]]*www\.deutschlandfunkkultur\.de, Kulturpresseschau.+||" <<< "$DESCRIPTION"
+  sed -re "s|[[:space:]]*www\.deutschlandfunk\.de, Das Feature.+||" <<< "$DESCRIPTION"
 
   # signalize success
   exit 0
@@ -143,8 +143,7 @@ if [ "$1" == "-t" ] ; then
   [ -z "$EPAUTHOR" ] && EPAUTHOR="LASTNAME, FIRSTNAME"
   [ -z "$EPDATE"   ] && EPDATE=$(date -u "+%Y-%m-%d %H:%M:%S %Z")
 
-
-  # full name of month
+  # get date's title format
   MYDATE=$(date -d "$EPDATE" "+%-d. %B %Y" 2>"/dev/null")
 
   # push title to stdout

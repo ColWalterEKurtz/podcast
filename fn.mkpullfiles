@@ -470,6 +470,22 @@ function get_year()
   return 0
 }
 
+# ------------
+# get_sort_key
+# ------------
+#
+# $1  podcast feed
+# $2  episode date
+#
+function get_sort_key()
+{
+  local YYYYMMDD=$(date -d "$2" +"%Y-%m-%d")
+  local SEC2MIDN=$(sec_to_midnight "$2")
+
+  # push key to stdout
+  simplify <<< "$YYYYMMDD $1 $SEC2MIDN"
+}
+
 # --------------
 # show_pull_file
 # --------------
@@ -1042,19 +1058,19 @@ do
       PULL_DUR_CHK="$DURATION"
 
       # set cfg information
-      CFG_BACKGROUND=$(bash "$FEED_FILE" -i)
-      CFG_FOREGROUND=$(get_foreground_image "$DATE")
+       CFG_BACKGROUND=$(bash "$FEED_FILE" -i)
+       CFG_FOREGROUND=$(get_foreground_image "$DATE")
       CFG_COMPRESSION=$(bash "$FEED_FILE" -q)
-      CFG_TOPDIR=$(bash "$FEED_FILE" -d)
-      CFG_GENRE="Speech"
-      CFG_ARTIST=$(bash "$FEED_FILE" -a)
-      CFG_ALBUM=$(get_album "$DATE")
-      CFG_YEAR=$(get_year "$DATE")
-      CFG_TITLE=$(bash "$FEED_FILE" -t "$TITLE" "$AUTHOR" "$DATE")
-      CFG_COMMENT="$DESCRIPTION"
-      CFG_AUTHOR="$AUTHOR"
-      CFG_AIRTIME="$DATE"
-      CFG_SORTKEY=$(simplify <<< "$(date -d "$DATE" +"%Y-%m-%d") $FEED_TITLE $(sec_to_midnight "$DATE")")
+           CFG_TOPDIR=$(bash "$FEED_FILE" -d)
+            CFG_GENRE="Speech"
+           CFG_ARTIST=$(bash "$FEED_FILE" -a)
+            CFG_ALBUM=$(get_album "$DATE")
+             CFG_YEAR=$(get_year "$DATE")
+            CFG_TITLE=$(bash "$FEED_FILE" -t "$TITLE" "$AUTHOR" "$DATE")
+          CFG_COMMENT=$(bash "$FEED_FILE" -c "$DESCRIPTION")
+           CFG_AUTHOR="$AUTHOR"
+          CFG_AIRTIME="$DATE"
+          CFG_SORTKEY=$(get_sort_key "$FEED_TITLE" "$DATE")
 
       # create pull file
       show_pull_file > "$PULLDIR$PULLFILE"
