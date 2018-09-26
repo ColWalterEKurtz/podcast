@@ -414,7 +414,7 @@ function unify_description()
 function get_foreground_image()
 {
   # source directory for all date files
-  local readonly IMAGEDIR="${PODCASTDIR}/images/months/"
+  local readonly IMAGEDIR="${PODCASTDIR}images/months/"
 
   # get year and month from date
   local UTCY=$(sed -nre "s/^([[:digit:]]+)-0*([[:digit:]]+)-.+/\1/p" <<< "$1")
