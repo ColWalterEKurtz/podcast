@@ -211,7 +211,7 @@ function update_keyfile()
 # ------------------------------------------------------------------------------
 
 # set default value (all episodes)
-EPISODES="bcdewfrhupksz"
+EPISODES="bcdewtfrhupksz"
 
 if (( $# == 1 )) ; then
 
@@ -231,6 +231,7 @@ if (( $# == 1 )) ; then
       echo "   d   search Dossier/           directory"
       echo "   e   search Essay/             directory"
       echo "   w   search EineWelt/          directory"
+      echo "   t   search Feature/           direktory"
       echo "   f   search Forschung/         direktory"
       echo "   r   search Forum/             direktory"
       echo "   h   search Hintergrund/       directory"
@@ -241,7 +242,7 @@ if (( $# == 1 )) ; then
       echo "   z   search ZeitZeichen/       directory"
       echo
       echo "   N   bcfks"
-      echo "   S   derupk"
+      echo "   S   detrupk"
       echo
       echo "   default is: $EPISODES"
       echo
@@ -263,7 +264,7 @@ if (( $# == 1 )) ; then
     elif [ "$1" == "S" ] ; then
 
       # use these feeds
-      EPISODES="derupk"
+      EPISODES="detrupk"
 
     else
 
@@ -320,6 +321,7 @@ REGEXP[c]="/ComKom/"
 REGEXP[d]="/Dossier/"
 REGEXP[e]="/Essay/"
 REGEXP[w]="/EineWelt/"
+REGEXP[t]="/Feature/"
 REGEXP[f]="/Forschung/"
 REGEXP[r]="/Forum/"
 REGEXP[h]="/Hintergrund/"
