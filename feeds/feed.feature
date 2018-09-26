@@ -29,7 +29,7 @@ readonly PODCASTDIR="$HOME/podcast"
 # invariable values
 readonly         URL="https://www.deutschlandfunk.de/podcast-das-feature.1248.de.podcast.xml"
 readonly MINDURATION="00:40:00"
-readonly MAXDURATION="00:50:00"
+readonly MAXDURATION="00:55:00"
 readonly      TOPDIR="$PODCASTDIR/audio/Feature/"
 readonly  BACKGROUND="$PODCASTDIR/images/feature.png"
 readonly     QUALITY="100"
