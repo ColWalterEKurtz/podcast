@@ -1,163 +1,357 @@
 #!/bin/bash
 
 # ------------------------------------------------------------------------------
-# parameters                                                          parameters
-# ------------------------------------------------------------------------------
-
-PLAYLIST="$1"
-TARGETDIR="$2"
-
-# ------------------------------------------------------------------------------
 # settings                                                              settings
 # ------------------------------------------------------------------------------
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
 
-# some common sed commands
-readonly SED_MAXLEN='/.{2049}/d'
-readonly SED_NOCOMM='/^[[:space:]]*#/d'
-readonly SED_ESCINS='s/:/:c/g; s/ /:s/g; s/\x09/:t/g; s/\\/:b/g'
-readonly SED_ESCDEL='s/:b/\\/g; s/:t/\x09/g; s/:s/ /g; s/:c/:/g'
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
 
 # ------------------------------------------------------------------------------
 # functions                                                            functions
 # ------------------------------------------------------------------------------
 
-# ------
-# errmsg
-# ------
+# -------
+# failmsg
+# -------
 #
-# This function prints a red error message via stderr.
+# This function prints a red colored message via stderr.
 #
-function errmsg()
+function failmsg()
 {
   # push to stderr
-  echo -e "\e[1;91m[ERROR]\e[0m $1" 1>&2
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
 }
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# ------------------
+# get_inflated_title
+# ------------------
+#
+# $1  mp3 file
+#
+function get_inflated_title()
+{
+  eyeD3 -v "$1"           \
+  | sed --quiet           \
+        --regexp-extended \
+        --expression="
+
+          # ARTIST found
+          /[^:]+\(TPE1\):/ {
+
+            # crop name
+            s|^[^:]+\(TPE1\):[[:space:]]+(.+)>$|ARTIST=\1|
+
+            # append name to hold space
+            H
+
+            # branch to end
+            b lastline
+          }
+
+          # ALBUM found
+          /[^:]+\(TALB\):/ {
+
+            # crop album name
+            s|^[^:]+\(TALB\):[[:space:]]+(.+)>$|ALBUM=\1|
+
+            # append name to hold space
+            H
+
+            # branch to end
+            b lastline
+          }
+
+          # TITLE found
+          /[^:]+\(TIT2\):/ {
+
+            # crop title
+            s|^[^:]+\(TIT2\):[[:space:]]+(.+)>$|TITLE=\1|
+
+            # append name to hold space
+            H
+
+            # branch to end
+            b lastline
+          }
+
+          # handle last line
+          :lastline $ {
+
+            # copy hold space three times to pattern space
+            s/.*/\x00TITLE>\x00\x0A/     ; G ; s/$/\x0A\x00<TITLE\x00\x0A/
+            s/$/\x0A\x00ALBUM>\x00\x0A/  ; G ; s/$/\x0A\x00<ALBUM\x00\x0A/
+            s/$/\x0A\x00ARTIST>\x00\x0A/ ; G ; s/$/\x0A\x00<ARTIST\x00\x0A/
+
+            # create custom order
+            s/\x00TITLE>\x00.*\x0ATITLE=([^\x0A]+).*\x00<TITLE\x00/\1/
+            s/\x00ALBUM>\x00.*\x0AALBUM=([^\x0A]+).*\x00<ALBUM\x00/\1/
+            s/\x00ARTIST>\x00.*\x0AARTIST=([^\x0A]+).*\x00<ARTIST\x00/\1/
+
+            # remove trailing space
+            s/[[:space:]]+$//
+
+            # concatenate lines
+            s/\x0A+/ \/ /g
+
+            # squeeze white space
+            s/[[:space:]]+/ /g
+
+            # print non-empty lines
+            /.+/ p
+          }
+        "
+}
+
+# ------------------------------------------------------------------------------
+# options                                                                options
+# ------------------------------------------------------------------------------
+
+# set default values
+OPMODE="DEFAULT"
+
+# set default values
+GENRE="Playlist"
+ARTIST="Playlist"
+ALBUM=$(date "+%Y-%m-%d+%H:%M:%S")
+YEAR=$(date "+%Y")
+
+# set options to accept
+readonly KNOWN_OPTIONS=":hva:b:g:y:"
+
+# check passed options
+while getopts "$KNOWN_OPTIONS" OPTION "$@"
+do
+
+  case "$OPTION" in
+
+    # show help
+    "h") OPMODE="SHOW_HELP"
+         ;;
+
+    # show version
+    "v") OPMODE="SHOW_VERSION"
+         ;;
+
+    # ARTIST
+    "a") ARTIST="$OPTARG"
+         ;;
+
+    # ALBUM
+    "b") ALBUM="$OPTARG"
+         ;;
+
+    # GENRE
+    "g") GENRE="$OPTARG"
+         ;;
+
+    # YEAR
+    "y") YEAR="$OPTARG"
+         ;;
+
+    "?") failmsg "unknown option: -$OPTARG"
+         exit 1
+         ;;
+
+    ":") failmsg "missing argument: -$OPTARG <argument>"
+         exit 1
+         ;;
+
+  esac
+
+done
+
+# get number of positional parameters
+PPNUM=$(( $# - OPTIND + 1 ))
+
+# check number of positional parameters
+if (( PPNUM != 2 )) ; then
+
+  # notify user
+  failmsg "exactly two positional parameters needed"
+
+  ## signalize trouble
+  exit 1
+
+fi
+
+# drop all parsed options
+shift $(( OPTIND - 1 ))
 
 # ------------------------------------------------------------------------------
 # commands                                                              commands
 # ------------------------------------------------------------------------------
 
-# set default value
-ADDREPLAYGAIN=0
+# name positional parameters
+PLAYLIST="$1"
+TARGETDIR="$2"
 
-# check if 'ReplayGain' option is given
-if [ "$PLAYLIST" == '-r' ]; then
-
-  # update flag
-  ADDREPLAYGAIN=1
-
-  # drop option
-  shift
-
-  # update values
-  PLAYLIST="$1"
-  TARGETDIR="$2"
-
-fi
-
-# check playlist
-if [ "$PLAYLIST" == ''       ] \
-|| [ "$PLAYLIST" == '-h'     ] \
-|| [ "$PLAYLIST" == '--help' ] ; then
-
-  echo
-  echo 'plcopy [-r] <playlist.m3u> [<target dir>]'
-  echo
-  echo ' -r  add ReplayGain to copied mp3 files'
-  echo
-  exit 1
-
-fi
-
-# format directory
-TARGETDIR=$(sed -re 's|/+$||; s|.+|&/|; s|^\./$||' <<< "$TARGETDIR")
+# assert trailing slash
+TARGETDIR=$(sed -re "s|.+|&/| ; s|//$|/|" <<< "$TARGETDIR")
 
 # check file
-if [ ! -f "$PLAYLIST" ]; then
+if [ ! -f "$PLAYLIST" ] ; then
 
   # notify user
-  errmsg "unable to open file: \"$PLAYLIST\""
+  failmsg "unable to locate file: \"$PLAYLIST\""
 
   # signalize trouble
   exit 1
 
 fi
 
-# check directory
-if [ ! -d "$TARGETDIR" ]; then
+# check target directory
+if [ ! -d "$TARGETDIR" ] ; then
 
-  # notify user
-  errmsg "unable to locate directory: \"$TARGETDIR\""
+  # try to create target directory
+  mkdir -p "$TARGETDIR" &>"/dev/null"
 
-  # signalize trouble
-  exit 1
-
-fi
-
-# use this number as part of the new filename
-NAMEINDEX=0
-
-# read lines from text file
-while read ESCLINE
-do
-
-  # remove inserted escape sequences and skip comments
-  FILENAME=$(sed -re "$SED_ESCDEL; $SED_NOCOMM" <<< "$ESCLINE")
-
-  # skip empty lines
-  [ -z "$FILENAME" ] && continue
-
-  # check given path
-  if [ ! -f "$FILENAME" ]; then
+  # check if target directory is still missing
+  if [ ! -d "$TARGETDIR" ] ; then
 
     # notify user
-    errmsg "unable to locate file: \"$FILENAME\""
+    failmsg "unable to locate directory: \"$TARGETDIR\""
 
-    # next file
-    continue
+    # signalize trouble
+    exit 1
 
   fi
 
-  # increase counter
-  (( NAMEINDEX += 1 ))
+fi
 
-  # get extension
-  EXTENSION=$(basename "$FILENAME" | sed -nre 's/.*(\.[^\.]+)$/\L\1/p')
+# file counter
+COUNTER=0
+
+# get audio files from playlist
+sed --regexp-extended \
+    --expression="
+
+      # skip empty lines
+      /^[[:space:]]*$/ d
+
+      # skip comments
+      /^[[:space:]]*#/ d
+
+    " "$PLAYLIST" \
+| while IFS='' read -r FILENAME
+do
+
+  # step counter
+  (( COUNTER += 1 ))
+
+  # check mp3 file
+  if [ ! -f "$FILENAME" ] ; then
+
+    # notify user
+    failmsg "unable to locate file: \"$FILENAME\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # get first three bytes
+  FILEFLAG=$(head -c3 "$FILENAME")
+
+  # check first three bytes
+  if [ "$FILEFLAG" != "ID3" ] ; then
+
+    # notify user
+    failmsg "this is no mp3 file: $FILENAME"
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+  # compile new title
+  TITLE=$(get_inflated_title "$FILENAME")
+  TITLE=$(printf "%04d - %s" "$COUNTER" "$TITLE")
 
   # compile new filename
-  NEWNAME=$(printf '%s%05d%s' "$TARGETDIR" "$NAMEINDEX" "$EXTENSION")
+  NEWNAME=$(printf "%s%04d.mp3" "$TARGETDIR" "$COUNTER")
 
   # show progress
   echo "$NEWNAME  <--  $(basename "$FILENAME")"
 
   # copy file
-  cp --no-clobber "$FILENAME" "$NEWNAME"
+  cp --force "$FILENAME" "$NEWNAME"
 
-done < <(sed -re "$SED_MAXLEN; $SED_ESCINS" "$PLAYLIST")
+  # update (remove) current tags
+  eyeD3 --no-tagging-time-frame \
+        --remove-comments       \
+        --remove-lyrics         \
+        --remove-images         \
+        --remove-all            \
+        --v2                    \
+        --to-v2.3               \
+        --genre="$GENRE"        \
+        --artist="$ARTIST"      \
+        --album="$ALBUM"        \
+        --year="$YEAR"          \
+        --track="$COUNTER"      \
+        --title="$TITLE"        \
+        "$NEWNAME"              &>"/dev/null"
 
-# normalize mp3 files (track gain)
-if (( ADDREPLAYGAIN == 1 )); then
-
-  # use current directory as default
-  [ -z "$TARGETDIR" ] && TARGETDIR="`pwd`"
-
-  # normalize mp3 files (track gain)
-  find "$TARGETDIR"                \
-       -maxdepth '1'               \
-       -type 'f'                   \
-       -regextype 'posix-extended' \
-       -regex '.+\.[Mm][Pp]3$'     \
-       -print0                     \
-  | sort --zero-terminated         \
-  | while read -rd $'\0' FILENAME
-  do
-
-    # this will create an ID3v2.4 tag
-    mp3gain -c -T -r -s i "$FILENAME"
-
-  done
-
-fi
+done
 
 # signalize success
 exit 0
