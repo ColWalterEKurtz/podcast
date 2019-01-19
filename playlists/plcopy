@@ -336,7 +336,8 @@ do
   cp --force "$FILENAME" "$NEWNAME"
 
   # update (remove) current tags
-  eyeD3 --no-tagging-time-frame \
+  eyeD3 --no-color              \
+        --no-tagging-time-frame \
         --remove-comments       \
         --remove-lyrics         \
         --remove-images         \
@@ -349,7 +350,8 @@ do
         --year="$YEAR"          \
         --track="$COUNTER"      \
         --title="$TITLE"        \
-        "$NEWNAME"              &>"/dev/null"
+        "$NEWNAME"              \
+        &>"/dev/null"
 
 done
 
