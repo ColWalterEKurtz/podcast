@@ -110,7 +110,6 @@ donemsg "file created: $NLIST"
 for USBSTICK in          \
   "/media/xi/4GB-FAT32"  \
   "/media/xi/16GB-FAT32" \
-  "/run/user/1000/gvfs/mtp:host=%5Busb%3A001%2C009%5D/Interner Speicher/Music" \
   ;
 do
 
@@ -129,18 +128,8 @@ do
     # create target directory
     mkdir --parents "$TDIR"
 
-    # check target
-    if [ "$USBSTICK" == "/run/user/1000/gvfs/mtp:host=%5Busb%3A001%2C009%5D/Interner Speicher/Music" ] ; then
-
-      # copy podcasts without numbers
-      ./plcopy "$PLIST" "$TDIR"
-
-    else
-
-      # copy podcasts with numbers
-      ./plcopy "$NLIST" "$TDIR"
-
-    fi
+    # copy podcasts with numbers
+    ./plcopy -b "Podcasts" "$NLIST" "$TDIR"
 
     # notify user
     donemsg "files copied to: $TDIR"

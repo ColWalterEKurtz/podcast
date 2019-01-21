@@ -322,18 +322,21 @@ do
 
   fi
 
-  # compile new title
-  TITLE=$(get_inflated_title "$FILENAME")
-  TITLE=$(printf "%04d - %s" "$COUNTER" "$TITLE")
-
   # compile new filename
   NEWNAME=$(printf "%s%04d.mp3" "$TARGETDIR" "$COUNTER")
 
   # show progress
   echo "$NEWNAME  <--  $(basename "$FILENAME")"
 
+  # compile new title
+  TITLE=$(get_inflated_title "$FILENAME")
+  TITLE=$(printf "%04d - %s" "$COUNTER" "$TITLE")
+
+  # create temporary file
+  TEMPFILE=$(mktemp --suffix=".mp3")
+
   # copy file
-  cp --force "$FILENAME" "$NEWNAME"
+  cp --force "$FILENAME" "$TEMPFILE"
 
   # update (remove) current tags
   eyeD3 --no-color              \
@@ -350,8 +353,25 @@ do
         --year="$YEAR"          \
         --track="$COUNTER"      \
         --title="$TITLE"        \
-        "$NEWNAME"              \
+        "$TEMPFILE"             \
         &>"/dev/null"
+
+  # move temporary file
+  mv --force "$TEMPFILE" "$NEWNAME" &>"/dev/null"
+
+  # check resulting file
+  if [ ! -s "$NEWNAME" ] ; then
+
+    # remove temporary file
+    rm --force "$TEMPFILE"
+
+    # notify user
+    failmsg "unable to create file: \"$NEWNAME\""
+
+    # signalize trouble
+    exit 1
+
+  fi
 
 done
 
