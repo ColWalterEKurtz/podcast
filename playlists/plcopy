@@ -173,9 +173,11 @@ GENRE="Playlist"
 ARTIST="Playlist"
 ALBUM=$(date "+%Y-%m-%d+%H:%M:%S")
 YEAR=$(date "+%Y")
+COMMENT=""
+IMAGE=""
 
 # set options to accept
-readonly KNOWN_OPTIONS=":hva:b:g:y:"
+readonly KNOWN_OPTIONS=":hva:b:c:g:i:y:"
 
 # check passed options
 while getopts "$KNOWN_OPTIONS" OPTION "$@"
@@ -199,8 +201,16 @@ do
     "b") ALBUM="$OPTARG"
          ;;
 
+    # COMMENT
+    "c") COMMENT="$OPTARG"
+         ;;
+
     # GENRE
     "g") GENRE="$OPTARG"
+         ;;
+
+    # IMAGE
+    "i") IMAGE="$OPTARG"
          ;;
 
     # YEAR
@@ -251,7 +261,7 @@ TARGETDIR=$(sed -re "s|.+|&/| ; s|//$|/|" <<< "$TARGETDIR")
 if [ ! -f "$PLAYLIST" ] ; then
 
   # notify user
-  failmsg "unable to locate file: \"$PLAYLIST\""
+  failmsg "unable to locate playlist: \"$PLAYLIST\""
 
   # signalize trouble
   exit 1
@@ -277,7 +287,23 @@ if [ ! -d "$TARGETDIR" ] ; then
 
 fi
 
-# file counter
+# check if image is given
+if [ -n "$IMAGE" ] ; then
+
+  # check if image exists
+  if [ ! -f "$IMAGE" ] ; then
+
+    # notify user
+    failmsg "unable to locate image: \"$IMAGE\""
+
+    # signalize trouble
+    exit 1
+
+  fi
+
+fi
+
+# initialize file counter
 COUNTER=0
 
 # get audio files from playlist
@@ -339,22 +365,34 @@ do
   cp --force "$FILENAME" "$TEMPFILE"
 
   # update (remove) current tags
-  eyeD3 --no-color              \
-        --no-tagging-time-frame \
-        --remove-comments       \
-        --remove-lyrics         \
-        --remove-images         \
-        --remove-all            \
-        --v2                    \
-        --to-v2.3               \
-        --genre="$GENRE"        \
-        --artist="$ARTIST"      \
-        --album="$ALBUM"        \
-        --year="$YEAR"          \
-        --track="$COUNTER"      \
-        --title="$TITLE"        \
-        "$TEMPFILE"             \
+  eyeD3 --no-color                    \
+        --no-tagging-time-frame       \
+        --remove-comments             \
+        --remove-lyrics               \
+        --remove-images               \
+        --remove-all                  \
+        --v2                          \
+        --to-v2.3                     \
+        --genre="$GENRE"              \
+        --artist="$ARTIST"            \
+        --album="$ALBUM"              \
+        --year="$YEAR"                \
+        --track="$COUNTER"            \
+        --title="$TITLE"              \
+        --comment=":COMMENT:$COMMENT" \
+        "$TEMPFILE"                   \
         &>"/dev/null"
+
+  # add image
+  if [ -n "$IMAGE" ] ; then
+
+    eyeD3 --no-color                       \
+          --no-tagging-time-frame          \
+          --add-image="$IMAGE:FRONT_COVER" \
+          "$TEMPFILE"                      \
+          &>"/dev/null"
+
+  fi
 
   # move temporary file
   mv --force "$TEMPFILE" "$NEWNAME" &>"/dev/null"
