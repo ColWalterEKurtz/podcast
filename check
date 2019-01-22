@@ -833,6 +833,20 @@ MP3FILE=$(get_first_mp3_file "$RAWDIR")
 [ -z "$CFGFILE" ] && exit 1
 [ -z "$MP3FILE" ] && exit 1
 
+# get first three bytes from mp3 file
+MP3FLAG=$(head -c3 "$MP3FILE")
+
+# check flag
+if [ "$MP3FLAG" != "ID3" ] ; then
+
+  # notify user
+  failmsg "this seems to be no mp3 file: \"$MP3FILE\""
+
+  # signalize trouble
+  exit 1
+
+fi
+
 # play mp3 file in background
 mplayer -nolirc -vc "null" -vo "null" -loop "0" "$MP3FILE" &>"/dev/null" &
 
