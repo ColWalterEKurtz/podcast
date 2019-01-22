@@ -129,7 +129,7 @@ do
     mkdir --parents "$TDIR"
 
     # copy podcasts with numbers
-    ./plcopy -b "Podcasts" "$NLIST" "$TDIR"
+    ./plcopy -g "Speech" -b "Podcast" -i "../images/podcast.png" "$NLIST" "$TDIR"
 
     # notify user
     donemsg "files copied to: $TDIR"
