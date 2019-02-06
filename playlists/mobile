@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# filename
+readonly PLIST="last100.m3u"
+
+# call daily100 to create basic playlist
+if ! ./daily100 "$@" > "$PLIST" ; then
+
+  # stop here
+  exit 1
+
+fi
+
+# copy playlist items
+plcopy -g "Speech"                      \
+       -a "Podcast"                     \
+       -b "$(date "+Last100: %Y-%m-%d")" \
+       -i "../images/podcast.png"       \
+       "$PLIST"                         \
+       "$(date "+Last100-%Y-%m-%d")"
+
+# signalize success
+exit 0
+
