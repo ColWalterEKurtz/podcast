@@ -254,24 +254,14 @@ if (( $# == 1 )) ; then
 
   else
 
-    # translate N
-    if [ "$1" == "N" ] ; then
+    # use given argument
+    EPISODES="$1"
 
-      # use these feeds
-      EPISODES="bcfks"
+    # translate N
+    EPISODES=$(sed -re "s/N/bcfks/g" <<< "$EPISODES")
 
     # translate S
-    elif [ "$1" == "S" ] ; then
-
-      # use these feeds
-      EPISODES="detrupk"
-
-    else
-
-      # use given argument
-      EPISODES="$1"
-
-    fi
+    EPISODES=$(sed -re "s/S/detrupk/g" <<< "$EPISODES")
 
   fi
 
