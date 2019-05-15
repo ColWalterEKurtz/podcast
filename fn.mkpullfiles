@@ -1050,7 +1050,7 @@ do
 
       # set pull information
       PULL_WEB_SRC="$MEDIA"
-      PULL_OUT_DIR="../raw/"
+      PULL_OUT_DIR="$HOME/podcast/raw/"
       PULL_OUT_MP3="$PULLCORE.mp3"
       PULL_OUT_CFG="$PULLCORE.cfg"
       PULL_DUR_MIN=$(bash "$FEED_FILE" -m)
