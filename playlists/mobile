@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# filename
+# filenames
 readonly PLIST="last100.m3u"
+readonly XLIST="selecta.m3u"
 
 # call daily100 to create basic playlist
 if ! ./daily100 "$@" > "$PLIST" ; then
@@ -11,12 +12,21 @@ if ! ./daily100 "$@" > "$PLIST" ; then
 
 fi
 
+# add extra episodes
+if [ -s "$XLIST" ] ; then
+
+  sed -i -re "1 i #XLIST" "$PLIST"
+  sed -i -re "1 r $XLIST" "$PLIST"
+  sed -i -re "1 d"        "$PLIST"
+
+fi
+
 # copy playlist items
-plcopy -g "Speech"                      \
-       -a "Podcast"                     \
+plcopy -g "Speech"                       \
+       -a "Podcast"                      \
        -b "$(date "+Last100: %Y-%m-%d")" \
-       -i "../images/podcast.png"       \
-       "$PLIST"                         \
+       -i "../images/podcast.png"        \
+       "$PLIST"                          \
        "$(date "+Last100-%Y-%m-%d")"
 
 # signalize success
