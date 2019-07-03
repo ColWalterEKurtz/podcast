@@ -29,7 +29,7 @@ readonly PODCASTDIR="$HOME/podcast"
 # invariable values
 readonly         URL="https://www.deutschlandfunk.de/podcast-sternzeit.733.de.podcast.xml"
 readonly MINDURATION="00:01:50"
-readonly MAXDURATION="00:02:10"
+readonly MAXDURATION="00:02:18"
 readonly      TOPDIR="$PODCASTDIR/audio/Sternzeit/"
 readonly  BACKGROUND="$PODCASTDIR/images/sternzeit.png"
 readonly     QUALITY="97"
