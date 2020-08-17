@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# sort entire group
+{
+
+  # get episodes from 1492 to 1648
+  ./zzgrep -f  "_pc_(149[23456789]|15|16[0123]|164[012345678])" \
+  | grep -Ev "geburtstag|geboren"                               \
+  | grep -Ev "todestag|gestorben"
+
+  # all birthdays from 1470 to 1600
+  ./zzgrep -f "_pc_(14[789]|15|1600)" \
+  | grep -E "geburtstag|geboren"
+
+  # all obits from 1540 to 1660
+  ./zzgrep -f "_pc_(15[456789]|15|16[012345]|1660)" \
+  | grep -E "todestag|gestorben"
+
+  # get special persons
+  ./zzgrep -f "poggio_bracciolini"
+
+} | ./zzsort
+
+# signalize success
+exit 0
+

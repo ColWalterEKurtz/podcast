@@ -1,0 +1,10 @@
+#!/bin/bash
+
+readonly KEYFILE="keyfile"
+
+# cat "$KEYFILE"
+
+egrep -v "corona|covid|ZeitZeichen/.+_sendung_1_april_|ZeitZeichen/.+_sendung_31_dezember" "$KEYFILE"
+
+exit 0
+

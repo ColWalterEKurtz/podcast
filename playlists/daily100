@@ -29,10 +29,6 @@ readonly MAGENTA=$(tput setaf 5)
 readonly    CYAN=$(tput setaf 6)
 readonly   WHITE=$(tput setaf 7)
 
-# filenames
-readonly PLIST="last100.m3u"
-readonly NLIST="last100num.m3u"
-
 # the root directory for all audio files
 readonly TOPDIR="$HOME/podcast/audio"
 
@@ -211,7 +207,7 @@ function update_keyfile()
 # ------------------------------------------------------------------------------
 
 # set default value (all episodes)
-EPISODES="bcdewtfrhupksz"
+EPISODES="bcfkz"
 
 if (( $# == 1 )) ; then
 
@@ -228,21 +224,9 @@ if (( $# == 1 )) ; then
       echo
       echo "   b   search Brennpunkt/        directory"
       echo "   c   search ComKom/            directory"
-      echo "   d   search Dossier/           directory"
-      echo "   e   search Essay/             directory"
-      echo "   w   search EineWelt/          directory"
-      echo "   t   search Feature/           direktory"
       echo "   f   search Forschung/         direktory"
-      echo "   r   search Forum/             direktory"
-      echo "   h   search Hintergrund/       directory"
-      echo "   u   search Kulturfragen/      directory"
-      echo "   p   search Kulturpresseschau/ directory"
       echo "   k   search KuSoWi/            directory"
-      echo "   s   search Sternzeit/         directory"
       echo "   z   search ZeitZeichen/       directory"
-      echo
-      echo "   N   bcfks"
-      echo "   S   detrupk"
       echo
       echo "   default is: $EPISODES"
       echo
@@ -256,12 +240,6 @@ if (( $# == 1 )) ; then
 
     # use given argument
     EPISODES="$1"
-
-    # translate N
-    EPISODES=$(sed -re "s/N/bcfks/g" <<< "$EPISODES")
-
-    # translate S
-    EPISODES=$(sed -re "s/S/detrupk/g" <<< "$EPISODES")
 
   fi
 
@@ -308,17 +286,8 @@ fi
 declare -A REGEXP
 REGEXP[b]="/Brennpunkt/"
 REGEXP[c]="/ComKom/"
-REGEXP[d]="/Dossier/"
-REGEXP[e]="/Essay/"
-REGEXP[w]="/EineWelt/"
-REGEXP[t]="/Feature/"
 REGEXP[f]="/Forschung/"
-REGEXP[r]="/Forum/"
-REGEXP[h]="/Hintergrund/"
-REGEXP[u]="/Kulturfragen/"
-REGEXP[p]="/Kulturpresseschau/"
 REGEXP[k]="/KuSoWi/"
-REGEXP[s]="/Sternzeit/"
 REGEXP[z]="/ZeitZeichen/"
 
 SEARCHEXP=""
@@ -354,8 +323,9 @@ if [ -z "$SEARCHEXP" ] ; then
 fi
 
 # show (at most) first 100 episodes
-egrep "$SEARCHEXP" "$KEYFILE" \
-| head -n "100"               \
+./catkeyfile         \
+| egrep "$SEARCHEXP" \
+| head -n "100"      \
 | sed -re "s/^[^[:space:]]+[[:space:]]+//"
 
 # signalize success

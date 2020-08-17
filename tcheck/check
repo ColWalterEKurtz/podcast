@@ -288,7 +288,7 @@ WORDFILE="zzwords"
 if [ -f "$WORDFILE" ] ; then
 
   # open editor
-  vim -c ":set complete=kzzwords" "+4" "$CHECKFILE"
+  vim -c ":set complete=k$WORDFILE" "+4" "$CHECKFILE"
 
 else
 

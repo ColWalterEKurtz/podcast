@@ -853,8 +853,21 @@ mplayer -nolirc -vc "null" -vo "null" -loop "0" "$MP3FILE" &>"/dev/null" &
 # get mplayer's process ID
 PID="$!"
 
-# open editor
-vim "+/TITLE=" "$CFGFILE"
+# set filename of the file to read words for auto-completion from
+WORDFILE="zzwords"
+
+# check if file is pressent
+if [ -f "$WORDFILE" ] ; then
+
+  # open editor
+  vim -c ":set complete=k$WORDFILE" "+/TITLE=" "$CFGFILE"
+
+else
+
+  # open editor
+  vim "+/TITLE=" "$CFGFILE"
+
+fi
 
 # check if mplayer is still running
 PROC=$(ps -A | grep -E "^[[:space:]]*$PID[[:space:]].+mplayer$")

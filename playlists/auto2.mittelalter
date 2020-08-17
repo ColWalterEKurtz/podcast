@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# sort entire group
+{
+
+  # get episodes from 0500 to 1500
+  ./zzgrep -f  "_pc_(0[56789]|1[01234]|1500)" \
+  | grep -Ev "geburtstag|geboren"             \
+  | grep -Ev "todestag|gestorben"
+
+  # all birthdays from 480 to 1450
+  ./zzgrep -f "_pc_(04[89]|0[56789]|1[0123]|14[01234]|1450)" \
+  | grep -E "geburtstag|geboren"
+
+  # all obits from 550 to 1520
+  ./zzgrep -f "_pc_(05[56789]|0[6789]|1[01234]|15[01]|1520)" \
+  | grep -E "todestag|gestorben"
+
+} | ./zzsort
+
+# signalize success
+exit 0
+

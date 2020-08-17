@@ -1,0 +1,215 @@
+#!/bin/bash
+
+# ------------------------------------------------------------------------------
+# settings                                                              settings
+# ------------------------------------------------------------------------------
+set -o errexit   # exit immediately if a command exits with a non-zero status
+set -o errtrace  # any trap on ERR is inherited by shell functions,
+                 #   command substitutions, and commands executed in a subshell
+                 #   environment
+set -o nounset   # treat unset variables and parameters other than the special
+                 #   parameters "@" and "*" as an error when performing
+                 #   parameter expansion
+set -o pipefail  # the return value of a pipeline is the value of the last
+                 #   (rightmost) command to exit with a non-zero status, or
+                 #   zero if all commands in the pipeline exit successfully
+
+# set language
+export LANG="en_US.UTF-8"
+
+# use dot as decimal separator
+export LC_NUMERIC="en_US.UTF-8"
+
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# ------------------------------------------------------------------------------
+# functions                                                            functions
+# ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
+
+# -------------
+# get_next_line
+# -------------
+#
+# $1  filename
+#
+function get_next_line()
+{
+  sed --quiet           \
+      --regexp-extended \
+      --expression="
+
+        # skip empty lines
+        /^[[:space:]]*$/ b
+
+        # skip comments
+        /^[[:space:]]*#/ b
+
+        # print line and exit
+        p ; q
+
+      " "$1"
+}
+
+# ------------------------------------------------------------------------------
+# options                                                                options
+# ------------------------------------------------------------------------------
+
+# set default values
+OPMODE="DEFAULT"
+
+# set options to accept
+readonly KNOWN_OPTIONS=":hv"
+
+# check passed options
+while getopts "$KNOWN_OPTIONS" OPTION "$@"
+do
+
+  case "$OPTION" in
+
+    # show help
+    "h") OPMODE="SHOW_HELP"
+         ;;
+
+    # show version
+    "v") OPMODE="SHOW_VERSION"
+         ;;
+
+    "?") failmsg "unknown option: -$OPTARG"
+         exit 1
+         ;;
+
+    ":") failmsg "missing argument: -$OPTARG <argument>"
+         exit 1
+         ;;
+
+  esac
+
+done
+
+# get number of positional parameters
+PPNUM=$(( $# - OPTIND + 1 ))
+
+# check number of positional parameters
+if (( PPNUM != 2 )) ; then
+
+  # notify user
+  failmsg "exactly two parameters needed: $0 <playlist> <tag file>"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# drop all parsed options
+shift $(( OPTIND - 1 ))
+
+# ------------------------------------------------------------------------------
+# commands                                                              commands
+# ------------------------------------------------------------------------------
+
+# name positional parameters
+PLAYLIST="$1"
+TAGFILE="$2"
+
+# check playlist path
+if [ ! -f "$PLAYLIST" ] ; then
+  failmsg "unable to locate playlist: \"$PLAYLIST\""
+  exit 1
+fi
+
+# check tag file's path
+if [ ! -f "$TAGFILE" ] ; then
+  touch "$TAGFILE" &> "/dev/null"
+  if [ ! -f "$TAGFILE" ] ; then
+    failmsg "unable to create tag file: \"$TAGFILE\""
+    exit 1
+  fi
+  infomsg "tag file created: $TAGFILE"
+fi
+
+# get path of playing media file
+MEDIAFILE=$(get_next_line "$PLAYLIST")
+
+# check path
+if [ -z "$MEDIAFILE" ] ; then
+  failmsg "no media file found: $PLAYLIST"
+  exit 1
+fi
+
+# add path to tag file
+printf "%s\n" "$MEDIAFILE" >> "$TAGFILE"
+
+# create temporary file
+TEMPFILE=$(mktemp)
+
+# remove duplicates
+sort -uo "$TEMPFILE" "$TAGFILE"
+
+# sort by date
+cat "$TEMPFILE" | zzsort > "$TAGFILE"
+
+# clean up
+rm -f "$TEMPFILE"
+
+# show result
+infomsg "file added: $TAGFILE  <--  $MEDIAFILE"
+
+# signalize success
+exit 0
+

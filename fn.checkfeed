@@ -71,12 +71,12 @@ function infomsg()
 }
 
 # -------
-# INFOMSG
+# infomsg
 # -------
 #
 # This function prints a blue colored message via stderr.
 #
-function INFOMSG()
+function infomsg()
 {
   # push to stderr
   echo -e "${BLUE}[INFO]${NONE} ${WHITER}$1${NONE}" 1>&2
@@ -298,7 +298,7 @@ TEMPFILE=$(mktemp)
 trap 'rm -rf "$TEMPFILE"' EXIT
 
 # notify user
-INFOMSG "updating rss feed: $URL"
+infomsg "updating rss feed: $URL"
 
 # download xml file once
 get_html "$URL" > "$TEMPFILE"
