@@ -1,6 +1,6 @@
 #!/bin/bash
 
-find "../audio/ZeitZeichen/"                               \
+find "$HOME/podcast/audio/ZeitZeichen/"                    \
      -type      "f"                                        \
      -regextype "posix-extended"                           \
      -regex     ".+\.[Mm][Pp]3$"                           \
