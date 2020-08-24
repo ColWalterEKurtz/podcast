@@ -83,53 +83,11 @@ function donemsg()
 }
 
 # ------------------------------------------------------------------------------
-# options                                                                options
-# ------------------------------------------------------------------------------
-
-# set default values
-OPMODE="DEFAULT"
-
-# set options to accept
-readonly KNOWN_OPTIONS=":hv"
-
-# check passed options
-while getopts "$KNOWN_OPTIONS" OPTION "$@"
-do
-
-  case "$OPTION" in
-
-    # show help
-    "h") OPMODE="SHOW_HELP"
-         ;;
-
-    # show version
-    "v") OPMODE="SHOW_VERSION"
-         ;;
-
-    "?") failmsg "unknown option: -$OPTARG"
-         exit 1
-         ;;
-
-    ":") failmsg "missing argument: -$OPTARG <argument>"
-         exit 1
-         ;;
-
-  esac
-
-done
-
-# get number of positional parameters
-PPNUM=$(( $# - OPTIND + 1 ))
-
-# drop all parsed options
-shift $(( OPTIND - 1 ))
-
-# ------------------------------------------------------------------------------
 # commands                                                              commands
 # ------------------------------------------------------------------------------
 
 # check number of positional parameters
-if (( PPNUM != 1 )) ; then
+if (( $# != 1 )) ; then
 
   # notify user
   failmsg "exactly one positional parameter needed: $(basename "$0") <target dir>"
@@ -139,9 +97,38 @@ if (( PPNUM != 1 )) ; then
 
 fi
 
+# -h or --help
+if [ "$1" == "-h" ] || [ "$1" == "--help" ] ; then
+
+  # notify user
+  failmsg "exactly one positional parameter needed: $(basename "$0") <target dir>"
+
+  # signalize trouble
+  exit 1
+
+fi
+
+# set timestamp of entire copy operation once
+COPYDATE=$(date "+%F %T %z")
+
 # set directory names
 SOURCEDIR="$HOME/podcast/audio/ZeitZeichen/"
 TARGETDIR=$(sed -re "s|.+|&/| ; s|//$|/|" <<< "$1")
+
+# show related directories
+infomsg "source: $SOURCEDIR"
+infomsg "target: $TARGETDIR"
+
+# check if source directory is missing
+if [ ! -d "$SOURCEDIR" ] ; then
+
+  # notify user
+  failmsg "unable to locate directory: \"$SOURCEDIR\""
+
+  # signalize trouble
+  exit 1
+
+fi
 
 # check if target directory is missing
 if [ ! -d "$TARGETDIR" ] ; then
@@ -160,6 +147,9 @@ if [ ! -d "$TARGETDIR" ] ; then
 
   fi
 
+  # set same modification time
+  touch -d "$COPYDATE" "$TARGETDIR"
+
 fi
 
 # check write permission
@@ -173,121 +163,45 @@ if [ ! -w "$TARGETDIR" ] ; then
 
 fi
 
-# show progress
-infomsg "removing fractional part from modification time..."
-
-# remove fractional part from modification time
-find "$SOURCEDIR"                 \
-      -type      "f"              \
-      -regextype "posix-extended" \
-      -regex     ".+\.[Mm][Pp]3$" \
-| LC_ALL=C sort                   \
-| while read -r FILENAME
+# find files unique to TARGETDIR
+comm -z13                                \
+      <(find "$SOURCEDIR"                \
+             -type      "f"              \
+             -regextype "posix-extended" \
+             -regex     ".+\.[Mm][Pp]3$" \
+             -printf    "%P\0"           \
+        | sort -zu)                      \
+      <(find "$TARGETDIR"                \
+             -type      "f"              \
+             -regextype "posix-extended" \
+             -regex     ".+\.[Mm][Pp]3$" \
+             -printf    "%P\0"           \
+        | sort -zu)                      \
+| while read -rd $'\0' FILENAME
 do
 
-  # get fractional and fix modification time
-  FRACTIME=$(stat --format="%y" "$FILENAME")
-  INTSTIME=$(sed -nre "s/(:[[:digit:]]{2})\.[[:digit:]]+([[:space:]].+)/\1\2/p" <<< "$FRACTIME")
-
-  # get current timestamp
-  PRIOR=$(find "$FILENAME" -printf "%T+ %p\n")
-
-  # remove fractional part from modification time
-  touch -d "$INTSTIME" "$FILENAME"
-
-  # get new timestamp
-  AFTER=$(find "$FILENAME" -printf "%T+ %p\n")
-
-  # show changes
-  if [ "$PRIOR" != "$AFTER" ] ; then
-     echo "$AFTER"
-  fi
-
-done
-
-# create temporary files
-TEMPS=$(mktemp --suffix=".$(basename "$0").source")
-TEMPT=$(mktemp --suffix=".$(basename "$0").target")
-
-# clean up on exit
-trap 'rm -f "$TEMPS" "$TEMPT"' EXIT
-
-# show progress
-infomsg "creating list of source files..."
-
-# list all source files
-find "$SOURCEDIR"                 \
-      -type      "f"              \
-      -regextype "posix-extended" \
-      -regex     ".+\.[Mm][Pp]3$" \
-      -printf    "%T+ %P\n"       \
-| LC_ALL=C sort                   \
-> "$TEMPS"
-
-# show progress
-infomsg "creating list of target files..."
-
-# list target files that are already present
-find "$TARGETDIR"                 \
-      -type      "f"              \
-      -regextype "posix-extended" \
-      -regex     ".+\.[Mm][Pp]3$" \
-      -printf    "%T+ %P\n"       \
-| LC_ALL=C sort                   \
-> "$TEMPT"
-
-# get number of source and target files
-NSF=$(sed -re "/^[[:space:]]*$/d" "$TEMPS" | wc -l)
-NTF=$(sed -re "/^[[:space:]]*$/d" "$TEMPT" | wc -l)
-
-# get number of files to remove and copy
-NRM=$(comm -13 "$TEMPS" "$TEMPT" | sed -re "/^[[:space:]]*$/d" | wc -l)
-NCP=$(comm -23 "$TEMPS" "$TEMPT" | sed -re "/^[[:space:]]*$/d" | wc -l)
-
-# show plan
-printf "source files   : %d\n" "$NSF"
-printf "target files   : %d\n" "$NTF"
-printf "files to remove: %d\n" "$NRM"
-printf "files to copy  : %d\n" "$NCP"
-
-# check number of changes
-if (( NRM + NCP > 50 )) ; then
-
-  # notify user
-  infomsg "more than 50 changes: waiting 10 seconds to start..."
-
-  # wait before changing many files
-  sleep 10
-
-fi
-
-# remove files that no longer exist
-comm -13 "$TEMPS" "$TEMPT"                  \
-| sed -nre "s/^[^[:space:]]+[[:space:]]//p" \
-| LC_ALL=C sort                             \
-| while read -r FILENAME
-do
-
-  # set name of file to remove
+  # set full path name
   DST="$TARGETDIR$FILENAME"
 
   # show progress
-  infomsg "removing file:"
-  find "$DST" -printf "%h\n%f\n%T+\n\n" \
-  | sed -re "s/^(.{77})....+/\1.../"
+  infomsg "- $(sed -re "s/^(.{68})....+/\1.../" <<< "$DST")"
 
-  # remove given file
+  # remove obsolete file
   rm -f "$DST"
 
 done
 
-# copy new and updated files
-comm -23 "$TEMPS" "$TEMPT"                  \
-| sed -nre "s/^[^[:space:]]+[[:space:]]//p" \
-| LC_ALL=C sort                             \
-| while read -r FILENAME
+# copy missing and newer files
+find "$SOURCEDIR"                \
+     -type      "f"              \
+     -regextype "posix-extended" \
+     -regex     ".+\.[Mm][Pp]3$" \
+     -printf    "%P\0"           \
+| sort -z                        \
+| while read -rd $'\0' FILENAME
 do
 
+  # set full path names
   SRC="$SOURCEDIR$FILENAME"
   DST="$TARGETDIR$FILENAME"
   DIR="$(dirname "$DST")"
@@ -309,24 +223,46 @@ do
 
     fi
 
+    # set same modification time
+    touch -d "$COPYDATE" "$DIR"
+
   fi
 
-  # copy mp3 file
-  cp "$SRC" "$DST"
+  # copy only newer (and missing) files
+  if [ "$SRC" -nt "$DST" ] || [ ! -f "$DST" ] ; then
 
-  # get source time without fractional part
-  SRCTIME=$(stat --format="%y" "$SRC" | sed -nre "s/(:[[:digit:]]{2})\.[[:digit:]]+([[:space:]].+)/\1\2/p")
+    # copy mp3 - file
+    cp "$SRC" "$DST"
 
-  # set same modification time
-  touch -d "$SRCTIME" "$DST"
+    # set same modification time
+    touch -d "$COPYDATE" "$DST"
 
-  # show progress
-  infomsg "file created:"
-  find "$DST" -printf "%h\n%f\n%T+\n" \
-  | sed -re "s/^(.{77})....+/\1.../"
-  echo
+    # show progress
+    infomsg "+ $(sed -re "s/^(.{68})....+/\1.../" <<< "$DST")"
+
+  fi
 
 done
+
+# count number of source files
+NSRCFILES=$(find "$SOURCEDIR"                \
+                 -type      "f"              \
+                 -regextype "posix-extended" \
+                 -regex     ".+\.[Mm][Pp]3$" \
+                 -printf    "."              \
+            | wc -c)
+ 
+# count number of target files
+NDSTFILES=$(find "$TARGETDIR"                \
+                 -type      "f"              \
+                 -regextype "posix-extended" \
+                 -regex     ".+\.[Mm][Pp]3$" \
+                 -printf    "."              \
+            | wc -c)
+
+# show number of files
+donemsg "source files: $NSRCFILES"
+donemsg "target files: $NDSTFILES"
 
 # signalize success
 exit 0

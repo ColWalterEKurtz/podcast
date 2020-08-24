@@ -20,9 +20,72 @@ export LANG="en_US.UTF-8"
 # use dot as decimal separator
 export LC_NUMERIC="en_US.UTF-8"
 
+# terminal colors
+readonly    NONE=$(tput sgr0)
+readonly     RED=$(tput setaf 1)
+readonly   GREEN=$(tput setaf 2)
+readonly  YELLOW=$(tput setaf 3)
+readonly    BLUE=$(tput setaf 4)
+readonly MAGENTA=$(tput setaf 5)
+readonly    CYAN=$(tput setaf 6)
+readonly   WHITE=$(tput setaf 7)
+
+# sox settings
+readonly GAIN_HEADROOM="-1"
+readonly CONTRAST_LEVEL="25"
+readonly TARGET_RMSDB="-24"
+
 # ------------------------------------------------------------------------------
 # functions                                                            functions
 # ------------------------------------------------------------------------------
+
+# -------
+# failmsg
+# -------
+#
+# This function prints a red colored message via stderr.
+#
+function failmsg()
+{
+  # push to stderr
+  echo -e "${RED}[FAIL]${NONE} $1" 1>&2
+}
+
+# -------
+# warnmsg
+# -------
+#
+# This function prints a yellow colored message via stderr.
+#
+function warnmsg()
+{
+  # push to stderr
+  echo -e "${YELLOW}[WARN]${NONE} $1" 1>&2
+}
+
+# -------
+# infomsg
+# -------
+#
+# This function prints a blue colored message via stderr.
+#
+function infomsg()
+{
+  # push to stderr
+  echo -e "${BLUE}[INFO]${NONE} $1" 1>&2
+}
+
+# -------
+# donemsg
+# -------
+#
+# This function prints a green colored message via stderr.
+#
+function donemsg()
+{
+  # push to stderr
+  echo -e "${GREEN}[DONE]${NONE} $1" 1>&2
+}
 
 # -------------
 # get_next_line
@@ -83,13 +146,13 @@ function hide_next_line()
 #
 function get_rms_level()
 {
-  sox "$1" --null         \
-      gain -n -1          \
-      contrast 25         \
-      stats               \
-      2>&1                \
-  | sed --quiet           \
-        --regexp-extended \
+  sox "$1" --null                \
+      gain -n "$GAIN_HEADROOM"   \
+      contrast "$CONTRAST_LEVEL" \
+      stats                      \
+      2>&1                       \
+  | sed --quiet                  \
+        --regexp-extended        \
         --expression="
 
           # add some extra characters for mono files
@@ -108,7 +171,7 @@ function get_rms_level()
 #
 function calculate_n_value()
 {
-  bc <<< "-1 - ($1 - -24)"
+  bc <<< "$GAIN_HEADROOM - ($1 - $TARGET_RMSDB)"
 }
 
 # ------------------------------------------------------------------------------
@@ -117,8 +180,13 @@ function calculate_n_value()
 
 # exactly one argument needed
 if (( $# != 1 )) ; then
-  echo "$0 <playlist>"
+
+  # notify user
+  failmsg "exactly one parameter needed: $(basename "$0") <playlist>"
+
+  # signalize trouble
   exit 1
+
 fi
 
 # play each track from given playlist
@@ -131,26 +199,39 @@ do
   # no more files
   [ -z "$MEDIAFILE" ] && break
 
-  # play single file
-  # mplayer "$MEDIAFILE"
+  # check ectracted path
+  if [ ! -f "$MEDIAFILE" ] ; then
+
+    # notify user
+    warnmsg "unable to locate file: \"$MEDIAFILE\""
+
+    # mark line as comment
+    hide_next_line "$1"
+
+    # try next file
+    continue
+
+  fi
 
   # calculate gain value
-  printf "calculating gain value"
+  infomsg "calculating gain value..."
   RMS1=$(get_rms_level "$MEDIAFILE")
   GAIN=$(calculate_n_value "$RMS1")
-  printf ": %.3f (from rms level %.3f dB)\n" "$GAIN" "$RMS1"
+  donemsg "using gain value $GAIN (from rms level $RMS1 dB)"
 
   # play single file at given rms level
-  play "$MEDIAFILE"     \
-        gain -n "$GAIN" \
-        contrast 25
-
-  # wait for second Ctrl+C
-  sleep 1
+  play "$MEDIAFILE"    \
+       gain -n "$GAIN" \
+       contrast "$CONTRAST_LEVEL"
 
   # comment out last played file
-  echo "tagging line as comment..."
+  infomsg "waiting 2 seconds before tagging line as comment..."
+  sleep 2
   hide_next_line "$1"
+  donemsg "line marked as comment"
+
+  echo
+  echo
 
 done
 
